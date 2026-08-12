@@ -193,38 +193,74 @@ These would change the output and I would rather ask than guess.
 4. **Refurbished / used listings.** Currently included. They drag median prices
    down noticeably on Mercado Libre. Exclude?
 
+5. **Apple in a gaming benchmark.** Apple is a tracked brand, but Apple does not
+   market gaming machines and neither retailer merchandises MacBooks that way.
+   Apple currently sits alongside the other three in the gaming categories, which
+   keeps the comparison meaningful. My concern is what happens on live data:
+   filtering strictly by each retailer's gaming categories would likely drop
+   Apple to near-zero shelf share on both platforms. Do you want Apple measured
+   inside the gaming boundary and reported as near-absent, or pulled from the
+   general notebook/desktop categories so there is something to compare against?
+
 ### On measurement
 
-5. **Which currency for the Brazil price benchmark** — BRL only, or also an
+6. **Which currency for the Brazil price benchmark** — BRL only, or also an
    FX-normalised USD view? (See 1.4.)
 
-6. **Compliance target.** Is there a contractual threshold (e.g. "95% of eligible
+7. **Compliance target.** Is there a contractual threshold (e.g. "95% of eligible
    SKUs must show the badge")? Right now the score is reported without a target
    line, so "81.5" has no pass/fail context.
 
-7. **Banner attribution confidence.** Banners carry no SKU, so brand attribution
+8. **Banner attribution confidence.** Banners carry no SKU, so brand attribution
    runs over alt text and link slug. Roughly 15–30% of slots are unattributable
    generic merchandising. Should those be excluded from banner share, or kept in
    the denominator as "inventory no brand won"? Currently kept.
 
+9. **Sponsored listings.** Both platforms mix paid placements into listing and
+   search results. I flag them (`is_sponsored`) but currently count them in Share
+   of Shelf and Share of Voice, on the basis that a shopper sees them either way.
+   The alternative reading is that bought visibility is not the same as won
+   visibility. Do you want shares organic-only, with sponsored reported beside
+   them?
+
+10. **Which price counts.** Newegg shows a list price, a promo-code price and
+    sometimes a member price; Mercado Libre shows an installment price next to
+    the cash price. I record the headline price a shopper sees first, before
+    entering any code. That understates real discounting where the saving is
+    behind a coupon. Is headline price the right basis?
+
+11. **Out-of-stock SKUs in Share of Shelf.** Shelf share counts listing rows, and
+    a listing tile does not reliably show stock — availability only becomes
+    visible on the product page (where 33 of 572 observations are currently out
+    of stock). So an unbuyable SKU still holds shelf share today. That is
+    defensible as "visibility" and misleading as "availability". Which should it
+    mean? If the latter, I would gate shelf share on the product-page stock flag
+    and accept the coverage gap that creates.
+
 ### On delivery
 
-8. **Who consumes the PSV/Excel exports** — a human in Excel, or a downstream
-   system? If it is a system, I would want to agree a stable schema and stop
-   changing column names between versions.
+12. **Who consumes the PSV/Excel exports** — a human in Excel, or a downstream
+    system? If it is a system, I would want to agree a stable schema and stop
+    changing column names between versions.
 
-9. **Alert delivery.** Alerts are currently stored and shown in the dashboard.
-   Do you want them pushed (email/Slack/webhook)? And what severity threshold
-   warrants a push?
+13. **Alert delivery.** Alerts are currently stored and shown in the dashboard.
+    Do you want them pushed (email/Slack/webhook)? And what severity threshold
+    warrants a push?
 
-10. **Retention.** Every run stores raw HTML. At the brief's cadence across both
+14. **Retention.** Every run stores raw HTML. At the brief's cadence across both
     platforms that is roughly 1–2 GB/month uncompressed. What retention window
     do you want, and is object storage available or should it stay on local
     disk?
 
+15. **Collection times.** The three daily slots are fixed at 06:00, 13:00 and
+    20:00 UTC so runs stay comparable day to day. That lands at 03:00 / 10:00 /
+    17:00 in Brazil and 22:00 / 05:00 / 12:00 US Pacific — comparable, but not
+    aligned to either market's shopping hours. Would you rather I set per-market
+    slots and give up direct cross-market comparability?
+
 ### On the data-access constraint
 
-11. **This is the one that needs an answer soonest.** Both platforms block
+16. **This is the one that needs an answer soonest.** Both platforms block
     datacenter IPs (see `DATA_SOURCING.md`). Live collection needs either a
     residential proxy / scraping API, or Mercado Libre OAuth credentials for the
     Brazil half. Which does Bridge AI already have, or which would you like me to
