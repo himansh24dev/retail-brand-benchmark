@@ -36,7 +36,7 @@ from dashboard.theme import (  # noqa: E402
 )
 
 st.set_page_config(
-    page_title="Retail Brand Benchmark",
+    page_title="Bridge AI Project — Himanshu Sharma",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -178,7 +178,7 @@ def empty_state() -> None:
 
 
 def page_overview() -> None:
-    st.title("Brand Benchmark")
+    st.title("Bridge AI Project — Himanshu Sharma")
     st.caption(
         "Side-by-side comparison of Intel, AMD, Qualcomm and Apple across Newegg (US) "
         "and Mercado Libre (Brazil), gaming segment. Every metric rolls up on the "
@@ -991,7 +991,7 @@ def main() -> None:
     bootstrap_warehouse()
 
     with st.sidebar:
-        st.markdown("### Retail Brand Benchmark")
+        st.markdown("### Bridge AI Project\n**Himanshu Sharma**")
         st.caption("Intel · AMD · Qualcomm · Apple  \nNewegg (US) · Mercado Libre (BR)")
         choice = st.radio("Section", list(PAGES), label_visibility="collapsed")
         st.divider()
