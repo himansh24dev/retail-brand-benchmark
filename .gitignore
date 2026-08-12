@@ -28,3 +28,6 @@ tests/fixtures/mercadolibre_br/
 # The client's own assignment brief. Kept out of the repo deliberately: it is
 # Bridge AI's document, not part of the deliverable, and this repo is public.
 Docs.pdf
+
+# Held back from the submitted repo for now (local copy retained).
+README.md

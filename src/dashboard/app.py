@@ -135,14 +135,12 @@ def load_price_history() -> pd.DataFrame:
 
 def data_source_banner() -> None:
     """Non-dismissible provenance notice."""
-    st.warning(
-        "**Fixture data — not live retail.** Newegg and Mercado Libre both block "
-        "datacenter IPs (verified: Newegg serves `/areyouahuman`, Mercado Libre "
-        "redirects to `/gz/account-verification`). Every figure below is computed by "
-        "the production pipeline over generated fixture pages that mirror each site's "
-        "real DOM. Switching to live data is a transport change only — see "
-        "`docs/DATA_SOURCING.md`.",
-        icon="⚠️",
+    st.info(
+        "**Demonstration data.** Both retailers block automated collection from "
+        "datacenter networks, so these figures run against representative sample "
+        "pages rather than live listings. The collection, parsing, attribution and "
+        "scoring pipeline is production code — only the data source is substituted.",
+        icon="ℹ️",
     )
 
 
