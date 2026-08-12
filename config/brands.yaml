@@ -1,0 +1,242 @@
+# Brand taxonomy for Bridge AI retail benchmark.
+#
+# The brief defines Brand as the chip/SoC supplier, independent of OEM.
+# Every metric in this project rolls up on this axis.
+#
+# Matching runs in priority order: a title containing both "Ryzen" and "RTX"
+# is AMD (the RTX is the discrete GPU, not the SoC supplier). Discrete-GPU
+# tokens therefore never attribute a system-level product; they only attribute
+# standalone component SKUs, where the GPU *is* the product.
+
+tracked_brands: [intel, amd, qualcomm, apple]
+
+# Untracked chip suppliers. Not a tracked brand, but must be attributable so
+# Share of Shelf has an honest denominator (shares sum to 100%, not to
+# "100% of the four we happen to care about").
+other_brands: [nvidia, mediatek, other]
+
+brands:
+
+  intel:
+    display_name: Intel
+    # Ordered most-specific-first. "Core Ultra 7" must win over "Core".
+    processor_lines:
+      - name: Core Ultra 9
+        patterns: ['core\s*ultra\s*9']
+        tier: ultra_premium
+      - name: Core Ultra 7
+        patterns: ['core\s*ultra\s*7']
+        tier: premium
+      - name: Core Ultra 5
+        patterns: ['core\s*ultra\s*5']
+        tier: mainstream
+      - name: Core Ultra
+        patterns: ['core\s*ultra']
+        tier: premium
+      - name: Core i9
+        patterns: ['core\s*i9', '\bi9[\s-]?\d{4,5}']
+        tier: ultra_premium
+      - name: Core i7
+        patterns: ['core\s*i7', '\bi7[\s-]?\d{4,5}']
+        tier: premium
+      - name: Core i5
+        patterns: ['core\s*i5', '\bi5[\s-]?\d{4,5}']
+        tier: mainstream
+      - name: Core i3
+        patterns: ['core\s*i3', '\bi3[\s-]?\d{4,5}']
+        tier: entry
+      - name: Xeon
+        patterns: ['\bxeon\b']
+        tier: workstation
+      - name: Pentium
+        patterns: ['\bpentium\b']
+        tier: entry
+      - name: Celeron
+        patterns: ['\bceleron\b']
+        tier: entry
+      - name: Arc
+        patterns: ['\bintel\s+arc\b', '\barc\s+a\d{3}\b', '\barc\s+b\d{3}\b']
+        tier: gpu
+        discrete_gpu: true
+    # Generic brand mentions — attribute only when no processor line matched.
+    brand_patterns: ['\bintel\b']
+    # Badges Intel requires retailers to display. Drives P2/S2 and module 6.
+    badges:
+      - name: Intel Core
+        patterns: ['intel\s*core(?!\s*ultra)']
+        applies_to_lines: [Core i3, Core i5, Core i7, Core i9]
+      - name: Intel Core Ultra
+        patterns: ['intel\s*core\s*ultra']
+        applies_to_lines: [Core Ultra, Core Ultra 5, Core Ultra 7, Core Ultra 9]
+      - name: Intel Evo
+        patterns: ['\bintel\s*evo\b', '\bevo\s*platform\b']
+        applies_to_lines: [Core Ultra, Core Ultra 5, Core Ultra 7, Core Ultra 9,
+                           Core i5, Core i7]
+        # Evo is a thin-and-light laptop certification; never valid on desktops.
+        product_types: [notebook, tablet]
+      - name: Intel vPro
+        patterns: ['\bvpro\b']
+        applies_to_lines: [Core Ultra 5, Core Ultra 7, Core Ultra 9, Core i5,
+                           Core i7, Core i9]
+      - name: Intel Arc
+        patterns: ['\bintel\s*arc\b']
+        applies_to_lines: [Arc]
+
+  amd:
+    display_name: AMD
+    processor_lines:
+      - name: Ryzen AI
+        patterns: ['ryzen\s*ai\s*(?:max\s*\+?\s*)?\d*', 'ryzen\s*ai']
+        tier: premium
+      - name: Ryzen Threadripper
+        patterns: ['threadripper']
+        tier: workstation
+      - name: Ryzen 9
+        patterns: ['ryzen\s*9']
+        tier: ultra_premium
+      - name: Ryzen 7
+        patterns: ['ryzen\s*7']
+        tier: premium
+      - name: Ryzen 5
+        patterns: ['ryzen\s*5']
+        tier: mainstream
+      - name: Ryzen 3
+        patterns: ['ryzen\s*3']
+        tier: entry
+      - name: EPYC
+        patterns: ['\bepyc\b']
+        tier: workstation
+      - name: Athlon
+        patterns: ['\bathlon\b']
+        tier: entry
+      - name: Radeon RX
+        patterns: ['\bradeon\s*rx\b', '\brx\s*[5-9]\d{3}\s*(?:xt)?\b']
+        tier: gpu
+        discrete_gpu: true
+      - name: Radeon
+        patterns: ['\bradeon\b']
+        tier: gpu
+        discrete_gpu: true
+    brand_patterns: ['\bamd\b']
+    badges:
+      - name: AMD Ryzen
+        patterns: ['amd\s*ryzen', '\bryzen\b']
+        applies_to_lines: [Ryzen 3, Ryzen 5, Ryzen 7, Ryzen 9,
+                           Ryzen Threadripper]
+      - name: AMD Ryzen AI
+        patterns: ['ryzen\s*ai']
+        applies_to_lines: [Ryzen AI]
+      - name: AMD Radeon
+        patterns: ['\bradeon\b']
+        applies_to_lines: [Radeon, Radeon RX]
+
+  qualcomm:
+    display_name: Qualcomm
+    processor_lines:
+      - name: Snapdragon X Elite
+        patterns: ['snapdragon\s*x\s*elite', '\bx\s*elite\b']
+        tier: ultra_premium
+      - name: Snapdragon X Plus
+        patterns: ['snapdragon\s*x\s*plus', '\bx\s*plus\b']
+        tier: premium
+      - name: Snapdragon X
+        patterns: ['snapdragon\s*x\b']
+        tier: premium
+      - name: Snapdragon 8cx
+        patterns: ['snapdragon\s*8cx', '\b8cx\b']
+        tier: mainstream
+      - name: Snapdragon
+        patterns: ['\bsnapdragon\b']
+        tier: mainstream
+    brand_patterns: ['\bqualcomm\b', '\bsnapdragon\b']
+    badges:
+      - name: Snapdragon
+        patterns: ['\bsnapdragon\b']
+        applies_to_lines: [Snapdragon, Snapdragon 8cx, Snapdragon X,
+                           Snapdragon X Plus, Snapdragon X Elite]
+      - name: Snapdragon X Elite
+        patterns: ['snapdragon\s*x\s*elite']
+        applies_to_lines: [Snapdragon X Elite]
+
+  apple:
+    display_name: Apple
+    # Apple's chip tokens are short and collide with unrelated retail text:
+    # "M2" appears in model codes and near "M.2" storage, "M3" in MSI SKUs.
+    # A line match only counts when Apple context is also present, which costs
+    # nothing on genuine Apple listings (they always name the family) and
+    # removes a whole class of false positives.
+    context_patterns: ['\bapple\b', '\bmacbook\b', '\bimac\b', '\bmac\s*(?:mini|studio|pro)\b',
+                       '\bipad\b', '\bmac\s*os\b', '\bmacos\b']
+    processor_lines:
+      - name: M4 Max
+        patterns: ['\bm4\s*max\b']
+        tier: ultra_premium
+      - name: M4 Pro
+        patterns: ['\bm4\s*pro\b']
+        tier: ultra_premium
+      - name: M4
+        patterns: ['\bm4\b(?!\s*(?:pro|max|ultra))', '\bchip\s*m4\b']
+        tier: premium
+      - name: M3 Ultra
+        patterns: ['\bm3\s*ultra\b']
+        tier: ultra_premium
+      - name: M3 Max
+        patterns: ['\bm3\s*max\b']
+        tier: ultra_premium
+      - name: M3 Pro
+        patterns: ['\bm3\s*pro\b']
+        tier: premium
+      - name: M3
+        patterns: ['\bm3\b(?!\s*(?:pro|max|ultra))']
+        tier: premium
+      - name: M2 Ultra
+        patterns: ['\bm2\s*ultra\b']
+        tier: ultra_premium
+      - name: M2 Max
+        patterns: ['\bm2\s*max\b']
+        tier: premium
+      - name: M2 Pro
+        patterns: ['\bm2\s*pro\b']
+        tier: premium
+      - name: M2
+        patterns: ['\bm2\b(?!\s*(?:pro|max|ultra))']
+        tier: mainstream
+      - name: M1
+        patterns: ['\bm1\s*(?:pro|max|ultra)?\b']
+        tier: mainstream
+    # "Apple" alone is weak evidence — it matches accessories and Apple-branded
+    # cables. Require an Apple product family alongside it.
+    brand_patterns: ['\bapple\s+(?:macbook|imac|mac\s*mini|mac\s*studio|mac\s*pro|ipad)\b',
+                     '\bapple\s+silicon\b']
+    badges:
+      - name: Apple Silicon
+        patterns: ['apple\s*silicon']
+        applies_to_lines: []   # empty = applies to every line of this brand
+      - name: M-series chip
+        patterns: ['\bm[1-4]\s*(?:pro|max|ultra)?\s*chip\b', '\bchip\s*m[1-4]\b']
+        applies_to_lines: []
+
+  nvidia:
+    display_name: NVIDIA
+    tracked: false
+    processor_lines:
+      - name: GeForce RTX
+        patterns: ['\bgeforce\s*rtx\b', '\brtx\s*[2-5]\d{3}\b']
+        tier: gpu
+        discrete_gpu: true
+      - name: GeForce GTX
+        patterns: ['\bgeforce\s*gtx\b', '\bgtx\s*\d{3,4}\b']
+        tier: gpu
+        discrete_gpu: true
+    brand_patterns: ['\bnvidia\b']
+    badges: []
+
+  mediatek:
+    display_name: MediaTek
+    tracked: false
+    processor_lines:
+      - name: Dimensity
+        patterns: ['\bdimensity\b']
+        tier: mainstream
+    brand_patterns: ['\bmediatek\b']
+    badges: []

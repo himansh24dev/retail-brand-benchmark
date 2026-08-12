@@ -1,0 +1,209 @@
+# Platform definitions: Newegg (US) and Mercado Libre (Brazil).
+#
+# Selectors are listed as ordered fallback chains. Retail DOMs change without
+# notice; a chain lets a collector survive a single markup change instead of
+# returning nulls. Every parse failure is logged with the raw snapshot path so
+# a broken selector is diagnosable after the fact rather than silent.
+
+platforms:
+
+  newegg_us:
+    display_name: Newegg
+    country: US
+    currency: USD
+    locale: en-US
+    base_url: https://www.newegg.com
+    # Newegg fronts Akamai + a JS interstitial. Playwright with a real browser
+    # profile gets through where plain httpx does not.
+    fetch_strategy: browser
+    rate_limit:
+      requests_per_minute: 8
+      jitter_seconds: [3, 9]
+      # Back off hard on the "are you a human?" interstitial rather than
+      # hammering and getting the IP blocked for the rest of the week.
+      block_backoff_seconds: 900
+    block_signals:
+      - 'are you a human'
+      - 'unusual traffic'
+      - 'access denied'
+    # Observed 2026-08-07: Newegg redirects blocked clients to /areyouahuman
+    # and serves it with HTTP 200 and a ~54KB body. Status and body-size checks
+    # both pass, so the redirect target is the only reliable signal.
+    block_url_signals:
+      - '/areyouahuman'
+      - 'challenge'
+    listing:
+      # Gaming-segment entry points, one per tracked product type.
+      categories:
+        - product_type: notebook
+          name: Gaming Laptops
+          url: https://www.newegg.com/Gaming-Laptops/SubCategory/ID-3365
+        - product_type: desktop
+          name: Gaming Desktops
+          url: https://www.newegg.com/Gaming-Desktops/SubCategory/ID-3395
+        - product_type: workstation
+          name: Workstations
+          url: https://www.newegg.com/Workstations/SubCategory/ID-3298
+        - product_type: tablet
+          name: Tablets
+          url: https://www.newegg.com/Tablets/SubCategory/ID-3066
+        - product_type: cpu
+          name: Processors - Desktops
+          url: https://www.newegg.com/Processors-Desktops/SubCategory/ID-343
+        - product_type: gpu
+          name: Desktop Graphics Cards
+          url: https://www.newegg.com/Desktop-Graphics-Cards/SubCategory/ID-48
+      pagination_param: page
+      max_pages: 6
+      selectors:
+        item: ['div.item-cell', 'div.item-container']
+        title: ['a.item-title', '.item-info .item-title']
+        url: ['a.item-title@href']
+        price_current: ['li.price-current', '.price-current']
+        price_was: ['li.price-was', '.price-was']
+        promo_text: ['p.item-promo', '.item-promo', '.price-save']
+        badge: ['.item-branding img@alt', '.item-features .badge',
+                '.item-brand img@alt']
+        image: ['a.item-img img@src']
+        rating: ['a.item-rating@title']
+        sponsored: ['.item-sponsored-flag', '.txt-ads-flag']
+    product:
+      selectors:
+        title: ['h1.product-title', '.product-wrap h1']
+        price_current: ['li.price-current', '.price-current strong']
+        price_was: ['li.price-was']
+        promo_text: ['.product-price-discount', '.promo-item-desc',
+                     '.product-price-save']
+        spec_table: ['#product-details table.table-horizontal',
+                     '.tab-panes table', 'table.table-horizontal']
+        badge: ['.product-brand-logo img@alt', '.product-badges img@alt',
+                '.benefit-item img@alt']
+        rich_media_brand: ['#product-details .product-manufacturer-content',
+                           '.manufacturer-content', '#manufacturer-content']
+        rich_media_oem: ['.product-overview-img', '#product-overview img',
+                         '.product-overview video']
+        oem_brand_field: ['.product-brand a@title', '.product-brand img@alt']
+        availability: ['.product-inventory', '.item-stock']
+    homepage:
+      url: https://www.newegg.com
+      banner_selectors:
+        container: ['.main-banner', '#bannerContainer', '.swiper-wrapper',
+                    '.home-banner']
+        slide: ['.swiper-slide', '.banner-item', 'a.main-banner-item']
+        image: ['img@src', 'img@data-src']
+        link: ['a@href', '@href']
+        alt: ['img@alt', 'img@title']
+      # Module 8 also asks for brand presence on the home page itself, not just
+      # the carousel. These target the featured/deal product tiles and are
+      # scoped to a container so they can never collide with banner slides.
+      featured_selectors:
+        item: ['.homepage-deals .item-cell', '.home-deals .item-cell',
+               '#todaysDeals .item-cell']
+        title: ['a.item-title', '.item-title']
+        url: ['a.item-title@href']
+    search:
+      # Share of Voice: rank position for a keyword set.
+      url_template: 'https://www.newegg.com/p/pl?d={keyword}&page={page}'
+      max_pages: 2
+      results_per_page: 36
+
+  mercadolibre_br:
+    display_name: Mercado Libre
+    country: BR
+    currency: BRL
+    locale: pt-BR
+    base_url: https://www.mercadolivre.com.br
+    # ML serves mostly server-rendered HTML and tolerates plain HTTP well;
+    # cheaper and far faster than driving a browser. Falls back to browser
+    # automatically when a block signal is seen.
+    fetch_strategy: http
+    rate_limit:
+      requests_per_minute: 15
+      jitter_seconds: [2, 5]
+      block_backoff_seconds: 600
+    block_signals:
+      - 'captcha'
+      - 'acesso negado'
+      - 'estamos verificando'
+    # Observed 2026-08-07: Mercado Libre 302s blocked clients to
+    # /gz/account-verification, again with HTTP 200 on the final page.
+    block_url_signals:
+      - '/gz/account-verification'
+      - '/gz/security'
+      - 'captcha'
+    listing:
+      categories:
+        - product_type: notebook
+          name: Notebooks Gamer
+          url: https://lista.mercadolivre.com.br/notebook-gamer
+        - product_type: desktop
+          name: PC Gamer
+          url: https://lista.mercadolivre.com.br/computador-gamer
+        - product_type: workstation
+          name: Workstation
+          url: https://lista.mercadolivre.com.br/workstation
+        - product_type: tablet
+          name: Tablets
+          url: https://lista.mercadolivre.com.br/tablet
+        - product_type: cpu
+          name: Processadores
+          url: https://lista.mercadolivre.com.br/processador-pc
+        - product_type: gpu
+          name: Placas de Video
+          url: https://lista.mercadolivre.com.br/placa-de-video
+      # ML paginates by result offset (_Desde_51), not page number.
+      pagination_style: offset
+      pagination_step: 50
+      max_pages: 5
+      selectors:
+        item: ['div.ui-search-result__wrapper', 'li.ui-search-layout__item',
+               'div.poly-card']
+        title: ['a.poly-component__title', 'h2.ui-search-item__title',
+                '.poly-component__title-wrapper a']
+        url: ['a.poly-component__title@href', 'a.ui-search-link@href']
+        price_current: ['.poly-price__current .andes-money-amount__fraction',
+                        '.andes-money-amount__fraction']
+        price_was: ['s.andes-money-amount--previous .andes-money-amount__fraction',
+                    '.andes-money-amount--previous .andes-money-amount__fraction']
+        promo_text: ['.poly-price__disc', '.andes-money-amount__discount',
+                     '.ui-search-price__discount']
+        badge: ['.poly-component__highlight', '.ui-search-item__highlight-label',
+                '.poly-component__shipped-from']
+        image: ['img.poly-component__picture@src',
+                'img.poly-component__picture@data-src']
+        rating: ['.poly-reviews__rating']
+        sponsored: ['.poly-component__ads-promotions', '.ui-search-item__ad-label']
+    product:
+      selectors:
+        title: ['h1.ui-pdp-title']
+        price_current: ['.ui-pdp-price__second-line .andes-money-amount__fraction']
+        price_was: ['.ui-pdp-price__original-value .andes-money-amount__fraction']
+        promo_text: ['.ui-pdp-price__second-line__label',
+                     '.andes-money-amount__discount']
+        spec_table: ['.ui-pdp-specs__table', '.andes-table',
+                     '.ui-vpp-highlighted-specs__attribute-columns']
+        badge: ['.ui-pdp-highlighted-specs__attribute', '.ui-pdp-promotions-pill']
+        rich_media_brand: ['.ui-pdp-description__content']
+        rich_media_oem: ['.ui-pdp-gallery img', '.ui-pdp-gallery video',
+                         '.ui-pdp-description img']
+        oem_brand_field: ['.ui-pdp-seller__link-trigger', '.ui-pdp-official-store']
+        availability: ['.ui-pdp-stock-information', '.ui-pdp-buybox__quantity']
+    homepage:
+      url: https://www.mercadolivre.com.br
+      banner_selectors:
+        container: ['.carousel-container', '.ui-homes-carousel',
+                    '.andes-carousel-snapped']
+        slide: ['.andes-carousel-snapped__slide', '.carousel-slide', 'li.slide']
+        image: ['img@src', 'img@data-src']
+        link: ['a@href', '@href']
+        alt: ['img@alt', 'img@title']
+      featured_selectors:
+        item: ['.ui-recommendations-list .poly-card',
+               '.ui-recommendations-list .ui-recommendations-card',
+               '.ui-homes-recommendations .poly-card']
+        title: ['a.poly-component__title', '.ui-recommendations-card__title']
+        url: ['a.poly-component__title@href', 'a@href']
+    search:
+      url_template: 'https://lista.mercadolivre.com.br/{keyword}'
+      max_pages: 2
+      results_per_page: 50

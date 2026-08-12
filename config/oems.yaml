@@ -1,0 +1,54 @@
+# OEM (device maker) taxonomy.
+#
+# Per the brief, OEM is an independent attribute from Brand and exists only as
+# a drill-down filter — no metric rolls up on it. Standalone CPU/GPU components
+# have no OEM (null, not "unknown"): the distinction matters because a null OEM
+# is correct and expected, while "unknown" means attribution failed.
+#
+# Apple appears as both brand and OEM. That is expected per the brief and must
+# not be de-duplicated.
+
+tracked_oems: [dell, hp, lenovo, acer, asus, msi, apple]
+
+oems:
+  dell:
+    display_name: Dell
+    patterns: ['\bdell\b', '\balienware\b']
+    sub_brands: [Alienware, Inspiron, XPS, G Series, Latitude, Precision]
+  hp:
+    display_name: HP
+    # Bare "hp" is dangerous — it matches "HP" inside model codes and the word
+    # "hp" in power specs. Require a word boundary plus a known family or the
+    # standalone token in a title-case context.
+    patterns: ['\bhp\b', '\bomen\b', '\bvictus\b', '\bhewlett[\s-]?packard\b']
+    sub_brands: [OMEN, Victus, Pavilion, EliteBook, ProBook, ZBook, Envy]
+  lenovo:
+    display_name: Lenovo
+    patterns: ['\blenovo\b', '\blegion\b', '\bthinkpad\b', '\bideapad\b',
+               '\bloq\b', '\bthinkbook\b']
+    sub_brands: [Legion, LOQ, ThinkPad, IdeaPad, Yoga, ThinkBook, ThinkStation]
+  acer:
+    display_name: Acer
+    patterns: ['\bacer\b', '\bpredator\b', '\bnitro\b', '\baspire\b']
+    sub_brands: [Predator, Nitro, Aspire, Swift, TravelMate, ConceptD]
+  asus:
+    display_name: ASUS
+    patterns: ['\basus\b', '\brog\b', '\brepublic of gamers\b', '\btuf\b',
+               '\bzenbook\b', '\bvivobook\b', '\bproart\b']
+    sub_brands: [ROG, TUF Gaming, Zenbook, Vivobook, ProArt, Strix, Zephyrus]
+  msi:
+    display_name: MSI
+    patterns: ['\bmsi\b', '\braider\b', '\bstealth\b', '\bkatana\b',
+               '\bcyborg\b', '\bthin\s*gf\d', '\bvector\b']
+    sub_brands: [Raider, Stealth, Katana, Cyborg, Vector, Titan, Creator, Sword]
+  apple:
+    display_name: Apple
+    patterns: ['\bapple\b', '\bmacbook\b', '\bimac\b', '\bmac\s*mini\b',
+               '\bmac\s*studio\b', '\bmac\s*pro\b', '\bipad\b']
+    sub_brands: [MacBook Air, MacBook Pro, iMac, Mac mini, Mac Studio, iPad]
+
+# Component makers that are NOT OEMs in this model. A "Gigabyte RTX 4070" is a
+# GPU board partner, not a device maker; its OEM stays null so it can't inflate
+# an OEM drill-down.
+board_partners: [gigabyte, evga, zotac, sapphire, powercolor, xfx, pny,
+                 galax, palit, inno3d, colorful, biostar, asrock]

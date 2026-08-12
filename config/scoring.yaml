@@ -1,0 +1,132 @@
+# Scoring rules for the retailer audit rubric and the composite score.
+#
+# Everything here is config, not code, because these are exactly the numbers a
+# client argues about in a walkthrough. Changing a weight must never require
+# touching Python.
+
+# ---------------------------------------------------------------------------
+# Module 2: Retailer Audits — S1, S2, P1..P5
+# ---------------------------------------------------------------------------
+audit:
+  checks:
+    S1:
+      page: listing
+      description: Title includes brand name and/or brand-specific processor line
+      weight: 1.0
+    S2:
+      page: listing
+      description: Badge presence on the listing tile
+      weight: 1.0
+    P1:
+      page: product
+      description: Title includes brand name, processor line, or generation
+      weight: 1.0
+    P2:
+      page: product
+      description: Badge presence on the product page
+      weight: 1.0
+    P3:
+      page: product
+      description: Brand or processor line mentioned in the spec table
+      weight: 1.0
+    P4:
+      page: product
+      description: Brand-led rich media present (images, HTML brand content)
+      weight: 1.0
+    P5:
+      page: product
+      description: OEM rich media present (images, videos, HTML content)
+      weight: 1.0
+
+  # ASSUMPTION (flagged for client): the brief specifies the 85/15 notebook /
+  # desktop rollup but not the relative weight of the seven checks. Equal
+  # weighting is the neutral default. Listed above per-check so the client can
+  # override any single check without a code change.
+
+  # The brief's stated rollup. Product types outside this map are still scored
+  # and visible in drill-down, but do not enter the headline compliance number.
+  product_type_weights:
+    notebook: 0.85
+    desktop: 0.15
+
+  # A check that cannot be evaluated (e.g. product page never loaded) must not
+  # silently score 0 — that would punish a brand for our own collection gap.
+  # Unevaluable checks are excluded from the denominator and surfaced as
+  # coverage %, so a low-coverage score is visibly low-confidence.
+  missing_check_policy: exclude_from_denominator
+  # Below this coverage, the score is shown but flagged as unreliable.
+  min_coverage_for_confidence: 0.60
+
+# ---------------------------------------------------------------------------
+# Nice-to-have: single composite "competitiveness" score per brand
+# ---------------------------------------------------------------------------
+competitiveness:
+  # Three pillars from the brief: pricing, visibility, compliance.
+  pillars:
+    pricing:
+      weight: 0.35
+      components:
+        # How aggressively the brand is discounted vs the tracked-set average.
+        promo_intensity: 0.5
+        # Where the brand's SKUs sit on price vs the set (context, not
+        # good/bad on its own — see note below).
+        price_position: 0.5
+    visibility:
+      weight: 0.40
+      components:
+        share_of_shelf: 0.45
+        share_of_voice: 0.35
+        banner_share: 0.20
+    compliance:
+      weight: 0.25
+      components:
+        brand_compliance_score: 1.0
+
+  # NOTE (flagged for client): "price position" has no objectively correct
+  # direction. A premium brand priced high is executing its strategy, not
+  # losing. Default treats *neither* direction as inherently better and scores
+  # only the absolute deviation from the brand's own trailing median, i.e.
+  # "is this brand's price positioning stable or moving?". Set
+  # `price_position_direction` to `lower_is_better` to score it as pure price
+  # aggression instead.
+  price_position_direction: stability   # stability | lower_is_better
+
+  # Normalisation across brands within a (platform, product_type, date) cell.
+  # min-max would let a single outlier compress everyone else; z-score keeps
+  # relative distances honest and is clamped to avoid infinite tails.
+  normalisation: zscore
+  zscore_clamp: 2.5
+
+# ---------------------------------------------------------------------------
+# Nice-to-have: change detection / alerts
+# ---------------------------------------------------------------------------
+alerts:
+  price_drop:
+    # Relative move vs the same SKU's previous observation.
+    threshold_pct: 10.0
+    severity: high
+  price_rise:
+    threshold_pct: 15.0
+    severity: medium
+  badge_disappeared:
+    # A badge present in the previous run and absent now, on an eligible SKU.
+    severity: high
+  badge_appeared:
+    severity: low
+  promo_started:
+    severity: medium
+  promo_ended:
+    severity: medium
+  share_of_shelf_swing:
+    # Percentage *points*, not percent — a 3pt shelf swing is large.
+    threshold_points: 3.0
+    severity: high
+  out_of_stock:
+    severity: medium
+  new_sku:
+    severity: low
+  delisted_sku:
+    # Absent for this many consecutive runs before it counts as delisted,
+    # so a single failed fetch doesn't fire a false alert.
+    consecutive_absences: 3
+    severity: medium

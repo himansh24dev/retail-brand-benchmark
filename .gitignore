@@ -1,0 +1,30 @@
+.venv/
+__pycache__/
+*.pyc
+
+# Warehouse and evidence store — regenerate with `python -m bridge build-history`
+#
+# NOTE: `data/bridge.db` is deliberately NOT ignored. It is a prebuilt demo
+# warehouse (~6 MB, generated from the fixtures in this repo) committed so the
+# hosted dashboard link opens instantly instead of making a first visitor wait
+# through a build. It is a derived artefact: delete it and run
+# `python -m bridge build-history --runs 9` to regenerate it byte-for-byte.
+# To stop tracking it: add `data/bridge.db` below and `git rm --cached data/bridge.db`.
+data/bridge.db-wal
+data/bridge.db-shm
+data/raw/
+
+# Generated deliverables
+exports/
+
+# Fixture pages are generated from catalog.py + generate.py, which ARE tracked.
+# 1026 files of derived HTML do not belong in git.
+tests/fixtures/newegg_us/
+tests/fixtures/mercadolibre_br/
+
+.streamlit/
+.DS_Store
+
+# The client's own assignment brief. Kept out of the repo deliberately: it is
+# Bridge AI's document, not part of the deliverable, and this repo is public.
+Docs.pdf

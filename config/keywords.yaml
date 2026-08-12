@@ -1,0 +1,124 @@
+# Share of Voice keyword sets, per country/platform.
+#
+# The set is deliberately dominated by *category* keywords (brand-neutral) —
+# those are the contested queries where SoV is a real competitive signal. If
+# every keyword named a brand, each brand would trivially win its own term and
+# the metric would say nothing.
+#
+# Branded keywords are kept in a separate group and reported separately, as a
+# defensive check ("does Intel actually rank #1 for 'intel gaming laptop'?").
+
+keyword_sets:
+
+  newegg_us:
+    country: US
+    language: en
+    category:
+      - keyword: gaming laptop
+        product_type: notebook
+        weight: 1.0
+      - keyword: gaming desktop
+        product_type: desktop
+        weight: 1.0
+      - keyword: gaming pc
+        product_type: desktop
+        weight: 1.0
+      - keyword: gaming cpu
+        product_type: cpu
+        weight: 0.8
+      - keyword: graphics card
+        product_type: gpu
+        weight: 0.8
+      - keyword: budget gaming laptop
+        product_type: notebook
+        weight: 0.6
+      - keyword: rtx gaming laptop
+        product_type: notebook
+        weight: 0.6
+      - keyword: workstation laptop
+        product_type: workstation
+        weight: 0.5
+      - keyword: gaming tablet
+        product_type: tablet
+        weight: 0.4
+      - keyword: esports laptop
+        product_type: notebook
+        weight: 0.4
+    branded:
+      - keyword: intel gaming laptop
+        expect_brand: intel
+      - keyword: amd gaming laptop
+        expect_brand: amd
+      - keyword: snapdragon laptop
+        expect_brand: qualcomm
+      - keyword: macbook pro
+        expect_brand: apple
+
+  mercadolibre_br:
+    country: BR
+    language: pt
+    category:
+      - keyword: notebook gamer
+        product_type: notebook
+        weight: 1.0
+      - keyword: pc gamer
+        product_type: desktop
+        weight: 1.0
+      - keyword: computador gamer
+        product_type: desktop
+        weight: 1.0
+      - keyword: processador gamer
+        product_type: cpu
+        weight: 0.8
+      - keyword: placa de video
+        product_type: gpu
+        weight: 0.8
+      - keyword: notebook gamer barato
+        product_type: notebook
+        weight: 0.6
+      - keyword: notebook gamer rtx
+        product_type: notebook
+        weight: 0.6
+      - keyword: workstation notebook
+        product_type: workstation
+        weight: 0.5
+      - keyword: tablet gamer
+        product_type: tablet
+        weight: 0.4
+      - keyword: notebook para jogos
+        product_type: notebook
+        weight: 0.4
+    branded:
+      - keyword: notebook intel gamer
+        expect_brand: intel
+      - keyword: notebook amd ryzen
+        expect_brand: amd
+      - keyword: notebook snapdragon
+        expect_brand: qualcomm
+      - keyword: macbook
+        expect_brand: apple
+
+# How a rank position converts to a visibility score. Position 1 is worth far
+# more than position 20; a linear weight would overstate deep results.
+# score = 1 / log2(position + 1)  — standard DCG discount.
+rank_scoring:
+  method: dcg
+  # Results below this rank score 0. Two pages deep is already generous
+  # relative to real shopper behaviour.
+  max_rank: 50
+
+# Home-page presence (module 8 asks for home page *and* search results).
+#
+# Reported as its own group rather than blended into the keyword SoV number:
+# a homepage tile and a rank for "gaming laptop" are different kinds of
+# visibility, and averaging them would produce a figure that cannot be
+# explained in a sentence. Both are shown side by side, and `blend_weight`
+# below is what a combined figure would use if the client wants one.
+homepage_presence:
+  enabled: true
+  # Tile position is discounted on the same DCG curve as search rank: the
+  # first row of a homepage grid is worth far more than the eighth.
+  max_rank: 24
+  # Relative weight of homepage presence vs keyword SoV, used only by the
+  # optional blended view. Homepage is one surface; the keyword set is ten.
+  blend_weight: 0.25
