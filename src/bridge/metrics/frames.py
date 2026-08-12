@@ -1,17 +1,4 @@
-"""DataFrame loaders — the single door between the warehouse and the metrics.
-
-Every metric reads through here so that two rules are enforced in exactly one
-place:
-
-1. **Only usable runs count.** A run that was blocked or parsed nothing has a
-   truncated product set. Including it would render as a brand's shelf share
-   collapsing, when what actually happened is that we failed to fetch. Runs are
-   filtered by status, not silently averaged in.
-
-2. **Listing rows drive shelf metrics; product rows drive price detail.** Both
-   land in `observation`, and mixing them double-counts a SKU that was seen on
-   both. Callers say which they want rather than each re-deriving the filter.
-"""
+"""DataFrame loaders — the single door between the warehouse and the metrics."""
 
 from __future__ import annotations
 
@@ -32,7 +19,6 @@ from ..db.models import (
 )
 from ..db.session import get_engine, session_scope
 
-# Runs in these states have a complete-enough product set to trust.
 USABLE_RUN_STATUSES = ("ok", "partial")
 
 
@@ -77,11 +63,7 @@ def products_frame() -> pd.DataFrame:
 
 
 def observations_frame(source_page: str | None = "listing") -> pd.DataFrame:
-    """Observations joined to their product and run.
-
-    `source_page='listing'` is the default because shelf position, rank and
-    the run's full product set only exist on listing rows.
-    """
+    """Observations joined to their product and run."""
     stmt = (
         select(
             Observation.id.label("observation_id"), Observation.run_id,
@@ -120,10 +102,6 @@ def audit_frame() -> pd.DataFrame:
             AuditCheck.run_id, AuditCheck.product_id, AuditCheck.observed_at,
             AuditCheck.check_code, AuditCheck.page_type, AuditCheck.passed,
             AuditCheck.evidence, AuditCheck.snapshot_path,
-            # Brand and product_type come from the audit row, NOT from Product.
-            # Joining to the live dimension would retroactively relabel every
-            # historical check when a SKU's attribution changes, silently
-            # rewriting compliance scores that were already reported.
             AuditCheck.brand, AuditCheck.product_type,
             Product.platform, Product.oem,
             Product.title, Product.platform_sku, Product.processor_line,
@@ -184,8 +162,6 @@ def banners_frame() -> pd.DataFrame:
         return df
     df["observed_at"] = pd.to_datetime(df["observed_at"], utc=True)
     df["date"] = df["observed_at"].dt.date
-    # Unattributed banners are a real category, not a null to drop: they are
-    # inventory no tracked brand won.
     df["brand"] = df["brand"].fillna("other")
     return df
 
@@ -226,12 +202,7 @@ def alerts_frame() -> pd.DataFrame:
 
 
 def latest_listing_run_ids() -> dict[str, int]:
-    """Most recent usable listing run per platform.
-
-    Snapshot metrics ("what does the shelf look like now?") must read one run
-    per platform, not a blend of the last few, or a SKU seen twice is counted
-    twice.
-    """
+    """Most recent usable listing run per platform."""
     with session_scope() as session:
         rows = session.execute(
             select(Run.platform, Run.id, Run.started_at)

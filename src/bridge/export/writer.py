@@ -1,14 +1,4 @@
-"""PSV and Excel deliverables.
-
-The brief asks for "Reports as PSV/Excel + an online dashboard". PSV
-(pipe-separated) rather than CSV because retail product titles are full of
-commas and quoting them reliably across Excel, pandas and whatever the client
-loads them into is a recurring source of silently mangled rows. Pipes do not
-appear in this data.
-
-Every sheet carries the same provenance header so a file that gets emailed
-onward still says where its numbers came from and how fresh they are.
-"""
+"""PSV and Excel deliverables."""
 
 from __future__ import annotations
 
@@ -43,11 +33,7 @@ PSV_SEP = "|"
 
 
 def _sheets() -> dict[str, pd.DataFrame]:
-    """Build every deliverable table once.
-
-    Sheet order follows the brief's module numbering so a reviewer can map the
-    workbook back to the requirements without a legend.
-    """
+    """Build every deliverable table once."""
     return {
         "01_brand_scoreboard": brand_scoreboard(),
         "02_pricing_summary": pricing_summary(),
@@ -93,12 +79,7 @@ def _sku_master() -> pd.DataFrame:
 
 
 def _provenance() -> pd.DataFrame:
-    """Header block describing the extract.
-
-    Includes the data-source caveat explicitly: a spreadsheet detached from
-    this repository must still disclose that its inputs are fixtures rather
-    than live retail pages.
-    """
+    """Header block describing the extract."""
     runs = runs_frame()
     window_start = runs["started_at"].min() if not runs.empty else None
     window_end = runs["started_at"].max() if not runs.empty else None
@@ -106,7 +87,7 @@ def _provenance() -> pd.DataFrame:
 
     fixture_runs = 0
     if not runs.empty and "notes" in runs:
-        fixture_runs = usable  # transport is recorded per-fetch; see fetch_log
+        fixture_runs = usable
 
     rows = [
         ("generated_at_utc", datetime.now(timezone.utc).isoformat(timespec="seconds")),
@@ -142,8 +123,6 @@ def export_psv(output_dir: Path | None = None) -> list[Path]:
     for name, frame in _sheets().items():
         path = target / f"{name}.psv"
         if frame is None or frame.empty:
-            # Write the header anyway: a consumer expecting the file should get
-            # an empty table, not a missing-file error.
             pd.DataFrame().to_csv(path, sep=PSV_SEP, index=False)
         else:
             frame.to_csv(path, sep=PSV_SEP, index=False)
@@ -166,14 +145,12 @@ def export_excel(output_dir: Path | None = None) -> list[Path]:
         notes.to_excel(writer, sheet_name="00_definitions", index=False)
 
         for name, frame in _sheets().items():
-            # Excel sheet names cap at 31 characters.
             sheet = name[:31]
             if frame is None or frame.empty:
                 pd.DataFrame({"note": ["no data for this metric yet"]}).to_excel(
                     writer, sheet_name=sheet, index=False
                 )
                 continue
-            # Timezone-aware datetimes cannot be written to xlsx.
             out = frame.copy()
             for col in out.columns:
                 if pd.api.types.is_datetime64_any_dtype(out[col]):

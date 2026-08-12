@@ -1,16 +1,4 @@
-"""Command-line entry point.
-
-    python -m bridge init-db
-    python -m bridge collect --module all
-    python -m bridge build-history --runs 9
-    python -m bridge metrics
-    python -m bridge export --format both
-    python -m bridge schedule
-
-Every command takes `--mode {auto,fixture,live}`. `live` is the switch that
-moves collection onto the network once credentials/proxy are available; nothing
-else in the codebase changes.
-"""
+"""Command-line entry point."""
 
 from __future__ import annotations
 
@@ -29,7 +17,6 @@ def _setup_logging(verbose: bool) -> None:
         format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
         datefmt="%H:%M:%S",
     )
-    # Playwright and httpx are extremely chatty at DEBUG.
     for noisy in ("httpx", "httpcore", "asyncio"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
@@ -43,25 +30,12 @@ def cmd_init_db(args: argparse.Namespace) -> int:
 
 
 def _ensure_fixtures(variants: int = 9) -> None:
-    """Generate the fixture corpus if it is not already on disk.
-
-    The generated pages are derived artefacts, so they are gitignored — which
-    means a fresh clone ships `generate.py` but none of its output. Without this
-    check, fixture-mode collection would run happily against an empty corpus and
-    report a warehouse of zero observations instead of an error, which reads as
-    "the pipeline is broken" rather than "the inputs were never built".
-
-    Regenerating is idempotent and takes a few seconds, so the cost of being
-    wrong here is far lower than the cost of a silent empty run.
-    """
+    """Generate the fixture corpus if it is not already on disk."""
     import importlib.util
 
     from .config import PROJECT_ROOT
 
     fixture_root = PROJECT_ROOT / "tests" / "fixtures"
-    # A platform is complete only if its URL index and the highest-numbered
-    # variant are both present: `--runs 12` against a 9-variant corpus would
-    # otherwise fail on runs 10-12 alone.
     needed = "homepage.html" if variants <= 1 else f"homepage.v{variants - 1}.html"
     missing = [
         key for key in platform_keys()
@@ -126,19 +100,7 @@ def cmd_collect(args: argparse.Namespace) -> int:
 
 def build_history(runs: int = 9, platforms: list[str] | None = None,
                   max_pages: int | None = None, quiet: bool = False) -> int:
-    """Replay N fixture variants as successive collection runs.
-
-    This is how the warehouse gets a usable history without waiting a real
-    week. Each variant is a distinct point-in-time capture, so trends, alerts
-    and slot comparisons are computed by the real pipeline over genuinely
-    different inputs — nothing is interpolated or back-filled.
-
-    Exposed as a plain function, not just a CLI command, because a hosted
-    dashboard has to be able to build its own warehouse on first boot — there
-    is no shell on the server to run `build-history` in.
-
-    Returns the number of observations parsed.
-    """
+    """Replay N fixture variants as successive collection runs."""
     from .metrics.alerts import generate_alerts
 
     def say(message: str) -> None:
@@ -154,8 +116,6 @@ def build_history(runs: int = 9, platforms: list[str] | None = None,
         results = _run_collectors(platforms, "all", "fixture", variant, max_pages)
         for row in results:
             total += row.get("items_parsed", 0) or row.get("results_parsed", 0) or 0
-        # Alerts compare each run against the one before it, so they must be
-        # generated per run rather than once at the end.
         if index > 0:
             created = generate_alerts()
             say(f"    alerts generated: {created}")
@@ -168,9 +128,6 @@ def cmd_build_history(args: argparse.Namespace) -> int:
 
     print(f"\nHistory built: {args.runs} runs, {total} observations parsed.")
     if total == 0:
-        # Every downstream deliverable (exports, dashboard, alerts) is derived
-        # from these observations, so a zero here produces empty-but-valid
-        # output — the failure mode that looks like success. Fail loudly.
         print(
             "\nERROR: no observations were parsed. The exports and dashboard "
             "would be empty.\n"

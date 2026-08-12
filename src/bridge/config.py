@@ -1,9 +1,4 @@
-"""Config loading and project paths.
-
-All tunable behaviour (brand patterns, selectors, weights, thresholds) lives in
-config/*.yaml. Nothing in this package hardcodes a brand name, a CSS selector,
-or a scoring weight.
-"""
+"""Config loading and project paths."""
 
 from __future__ import annotations
 
@@ -57,15 +52,6 @@ def scoring_config() -> dict[str, Any]:
     return _load_yaml("scoring.yaml")
 
 
-# ---------------------------------------------------------------------------
-# Compiled pattern access
-#
-# Every regex in config is compiled exactly once per process. Attribution runs
-# over tens of thousands of titles per day; re-compiling per title showed up as
-# the dominant cost in an early profile.
-# ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class ProcessorLine:
     brand: str
@@ -84,12 +70,7 @@ class BadgeSpec:
     product_types: frozenset[str] = field(default_factory=frozenset)
 
     def is_eligible(self, processor_line: str | None, product_type: str | None) -> bool:
-        """Whether this badge *should* appear on a product.
-
-        Eligibility is what makes a missing badge a compliance finding rather
-        than noise: flagging "no Intel Evo badge" on a desktop would be wrong,
-        because Evo is a laptop-only certification.
-        """
+        """Whether this badge *should* appear on a product."""
         if self.applies_to_lines and (processor_line or "") not in self.applies_to_lines:
             return False
         if self.product_types and (product_type or "") not in self.product_types:
@@ -103,11 +84,7 @@ def _compile(patterns: list[str]) -> tuple[re.Pattern[str], ...]:
 
 @functools.lru_cache(maxsize=None)
 def processor_lines() -> tuple[ProcessorLine, ...]:
-    """All processor lines across all brands, most-specific-first.
-
-    Order is significant and is preserved from YAML: "Core Ultra 7" is declared
-    before "Core Ultra", which is declared before the generic Intel fallback.
-    """
+    """All processor lines across all brands, most-specific-first."""
     out: list[ProcessorLine] = []
     for brand_key, spec in brands_config()["brands"].items():
         for line in spec.get("processor_lines") or []:
@@ -134,11 +111,7 @@ def brand_fallback_patterns() -> tuple[tuple[str, tuple[re.Pattern[str], ...]], 
 
 @functools.lru_cache(maxsize=None)
 def brand_context_patterns() -> dict[str, tuple[re.Pattern[str], ...]]:
-    """Brands whose line matches require corroborating context to count.
-
-    Only populated for brands with tokens short enough to collide with
-    unrelated retail text (see the note on Apple in brands.yaml).
-    """
+    """Brands whose line matches require corroborating context to count."""
     return {
         brand_key: _compile(spec["context_patterns"])
         for brand_key, spec in brands_config()["brands"].items()
@@ -185,7 +158,7 @@ def oem_sub_brand_patterns() -> tuple[tuple[str, str, re.Pattern[str]], ...]:
 def board_partner_pattern() -> re.Pattern[str]:
     partners = oems_config().get("board_partners") or []
     if not partners:
-        return re.compile(r"(?!x)x")  # never matches
+        return re.compile(r"(?!x)x")
     return re.compile(r"\b(" + "|".join(re.escape(p) for p in partners) + r")\b", re.IGNORECASE)
 
 

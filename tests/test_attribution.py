@@ -1,9 +1,4 @@
-"""Attribution tests, written against titles in the shape both platforms emit.
-
-The cases that matter most are the adversarial ones: a system whose discrete
-GPU belongs to a different brand than its CPU, and short Apple chip tokens
-appearing in non-Apple listings.
-"""
+"""Attribution tests, written against titles in the shape both platforms emit."""
 
 from __future__ import annotations
 
@@ -63,10 +58,6 @@ results += [
 ]
 
 print("\n=== Rule 1b: the brand-name FALLBACK must respect the same rule ===")
-# Regression: a system whose CPU is absent from the title was being attributed
-# to NVIDIA, because the generic '\bnvidia\b' fallback ran without the
-# discrete-GPU guard. Gaming titles almost always name the GPU vendor, so this
-# silently moved laptops out of Intel/AMD and into NVIDIA.
 results += [
     check(
         "laptop with no CPU in title must NOT become nvidia",

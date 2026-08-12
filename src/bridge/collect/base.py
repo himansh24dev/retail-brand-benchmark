@@ -1,10 +1,4 @@
-"""Shared collector machinery: run lifecycle, SKU upsert, absence tracking.
-
-Platform collectors subclass this and implement only the parts that genuinely
-differ — which URLs to hit and how to read a product card. Everything about
-*how a run is recorded* lives here, so Newegg and Mercado Libre cannot drift
-into recording their results differently.
-"""
+"""Shared collector machinery: run lifecycle, SKU upsert, absence tracking."""
 
 from __future__ import annotations
 
@@ -26,13 +20,7 @@ log = logging.getLogger(__name__)
 
 
 def current_slot(now: datetime | None = None) -> str:
-    """Label the 3x-daily collection window.
-
-    Named slots rather than raw timestamps because the brief's cadence is "3x
-    daily": comparing today's midday run to yesterday's midday run is the
-    meaningful comparison, and that requires the slot to be a first-class
-    label rather than something re-derived from an hour field at query time.
-    """
+    """Label the 3x-daily collection window."""
     hour = (now or datetime.now(timezone.utc)).hour
     if hour < 11:
         return "morning"
@@ -57,7 +45,6 @@ class BaseCollector(ABC):
         self.max_pages_override = max_pages
         self.run_id: int | None = None
 
-    # -- run lifecycle ------------------------------------------------------
 
     def start_run(self, session: Session) -> Run:
         run = Run(
@@ -94,11 +81,6 @@ class BaseCollector(ABC):
         run.blocked_count = fetcher.stats.blocked
         run.notes = notes
 
-        # Status drives whether metrics trust this run. A run that parsed
-        # nothing is "failed" even if every fetch returned 200 — a page that
-        # loads but yields no products means the selectors broke, and treating
-        # that as a valid zero would read as every brand vanishing from the
-        # shelf at once.
         if items_parsed == 0:
             run.status = "failed"
         elif fetcher.stats.blocked or fetcher.stats.errors or parse_errors:
@@ -115,7 +97,6 @@ class BaseCollector(ABC):
             fetcher.stats.blocked, fetcher.stats.errors,
         )
 
-    # -- SKU persistence ----------------------------------------------------
 
     def upsert_product(
         self,
@@ -129,13 +110,7 @@ class BaseCollector(ABC):
         badge_text: str = "",
         oem_brand_field: str = "",
     ) -> Product:
-        """Insert or update a SKU and its attribution.
-
-        Attribution is recomputed on every sighting rather than cached from
-        first sight: retailers edit titles in place, and a title edit that adds
-        the processor name is exactly the compliance improvement this project
-        exists to detect.
-        """
+        """Insert or update a SKU and its attribution."""
         product_type, is_component = resolve_product_type(category_product_type, title)
         brand_attr = attribute_brand(
             title, is_component=is_component, spec_text=spec_text, badge_text=badge_text
@@ -162,8 +137,6 @@ class BaseCollector(ABC):
             )
             session.add(product)
 
-        # A flip in brand attribution is a real event (a relist or a title
-        # rewrite), so it is stamped rather than silently overwritten.
         if product.brand and product.brand != brand_attr.brand and product.brand != "other":
             product.attribution_changed_at = now
             log.info(
@@ -179,9 +152,6 @@ class BaseCollector(ABC):
         product.brand_evidence = brand_attr.evidence
         product.processor_line = brand_attr.processor_line
         product.processor_tier = brand_attr.processor_tier
-        # Only overwrite a known OEM with another known OEM. A product-page
-        # pass that fails to find the OEM must not erase what the listing pass
-        # already established.
         if oem_attr.oem or product.oem is None:
             product.oem = oem_attr.oem
             product.oem_sub_brand = oem_attr.sub_brand
@@ -200,12 +170,7 @@ class BaseCollector(ABC):
         return obs
 
     def mark_absences(self, session: Session, seen_product_ids: set[int], run: Run) -> int:
-        """Increment absence counters for SKUs not seen in this run.
-
-        Only runs on a healthy run: incrementing absences after a blocked or
-        truncated run would mark half the catalogue delisted because we failed
-        to fetch it, not because it went away.
-        """
+        """Increment absence counters for SKUs not seen in this run."""
         if run.status not in ("ok",):
             log.info("[%s] skipping absence marking (run status=%s)",
                      self.platform_key, run.status)
@@ -233,7 +198,6 @@ class BaseCollector(ABC):
                 newly_delisted += 1
         return newly_delisted
 
-    # -- subclass contract --------------------------------------------------
 
     @abstractmethod
     def collect(self) -> dict[str, Any]:

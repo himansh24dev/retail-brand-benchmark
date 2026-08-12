@@ -1,15 +1,4 @@
-"""Listing and product-page collection (modules 1, 2, 4, 5, 6).
-
-One config-driven collector serves both platforms. The differences between
-Newegg and Mercado Libre that genuinely need code — SKU extraction from a URL,
-Mercado Libre's split fraction/cents price markup, and offset vs page-number
-pagination — are isolated in two small subclasses. Everything else (which URLs
-to visit, which selectors to try) is data in config/platforms.yaml.
-
-That split matters because the shared path is where correctness lives: both
-platforms must record an observation the same way, or cross-platform comparison
-in the dashboard is comparing two different definitions.
-"""
+"""Listing and product-page collection (modules 1, 2, 4, 5, 6)."""
 
 from __future__ import annotations
 
@@ -62,13 +51,9 @@ class RetailCollector(BaseCollector):
         self.mode = mode
         self.variant = variant
         self.product_pages = product_pages
-        # Product pages are the expensive half of a run. In production this
-        # caps blast radius when a category balloons; None means "audit
-        # everything", which is what the fixture set uses.
         self.product_page_limit = product_page_limit
         self.tracker = MissTracker()
 
-    # -- platform-specific hooks -------------------------------------------
 
     def extract_sku(self, url: str) -> str | None:
         raise NotImplementedError
@@ -82,7 +67,6 @@ class RetailCollector(BaseCollector):
     def listing_page_url(self, category_url: str, page: int) -> str:
         raise NotImplementedError
 
-    # -- main flow ----------------------------------------------------------
 
     def collect(self) -> dict[str, Any]:
         fetcher = make_fetcher(
@@ -97,7 +81,6 @@ class RetailCollector(BaseCollector):
         items_parsed = 0
         parse_errors = 0
         seen_ids: set[int] = set()
-        # (product_id, url, brand, processor_line, product_type) for the audit pass
         audit_queue: list[tuple[int, str, str, str | None, str]] = []
 
         try:
@@ -120,8 +103,6 @@ class RetailCollector(BaseCollector):
                         tree = parse_html(result.html)
                         cards = select_all(tree, selectors["item"])
                         if not cards:
-                            # No cards on page 1 means the selector broke; on a
-                            # later page it just means we ran out of results.
                             if page == 1:
                                 log.error("[%s] no items matched on %s — selector drift?",
                                           self.platform_key, url)
@@ -152,7 +133,6 @@ class RetailCollector(BaseCollector):
 
                 session.flush()
 
-            # --- product-page pass (P1-P5, specs, product badges)
             audited = 0
             if self.product_pages and audit_queue:
                 audited = self._audit_products(fetcher, audit_queue)
@@ -181,7 +161,6 @@ class RetailCollector(BaseCollector):
         finally:
             fetcher.close()
 
-    # -- listing card -------------------------------------------------------
 
     def _parse_card(
         self, session: Session, card: Any, *, category: dict, rank: int, page: int,
@@ -200,9 +179,6 @@ class RetailCollector(BaseCollector):
         badge_texts = select_texts(card, selectors.get("badge"))
         badge_blob = " ".join(badge_texts)
 
-        # Feature bullets on the card frequently name the processor even when
-        # the title omits it. Passing them as spec_text lets pass-1 attribution
-        # rescue the SKU instead of falling through to a weak brand-name match.
         feature_text = " ".join(select_texts(card, ["ul.item-features", ".item-features"]))
 
         product = self.upsert_product(
@@ -244,14 +220,9 @@ class RetailCollector(BaseCollector):
             source_page="listing", snapshot_path=snapshot,
         )
 
-        # --- listing-page rubric: S1, S2
         badge_findings = detect_badges(
             brand=product.brand, processor_line=product.processor_line,
             product_type=product.product_type, page_type="listing",
-            # Badge presence comes from the badge selector chain only. The
-            # broader card text is deliberately NOT passed: it contains the
-            # title and feature bullets, which restate the processor name and
-            # would mark the badge present on every SKU.
             badge_text=badge_blob, exclude_text=title,
         )
         for finding in badge_findings:
@@ -276,7 +247,6 @@ class RetailCollector(BaseCollector):
 
         return (product.id, url, product.brand, product.processor_line, product.product_type)
 
-    # -- product page -------------------------------------------------------
 
     def _audit_products(
         self, fetcher: Any, queue: list[tuple[int, str, str, str | None, str]]
@@ -284,9 +254,6 @@ class RetailCollector(BaseCollector):
         """Fetch each SKU's product page and evaluate P1-P5 plus specs."""
         from ..config import tracked_brands
 
-        # Only tracked brands carry compliance obligations, so an untracked SKU
-        # is not worth a page fetch. In production this is the difference
-        # between auditing ~40% of the shelf and all of it.
         targets = [row for row in queue if row[2] in tracked_brands()]
         if self.product_page_limit:
             targets = targets[: self.product_page_limit]
@@ -317,7 +284,6 @@ class RetailCollector(BaseCollector):
                 brand_media = " ".join(select_texts(tree, selectors.get("rich_media_brand")))
                 oem_media_present = bool(select_all(tree, selectors.get("rich_media_oem")))
 
-                # --- module 1 refresh from the product page (authoritative price)
                 price_current, price_was = self.parse_product_price(tree, selectors)
                 promo_text = select_one(tree, selectors.get("promo_text"))
                 price = build_price_info(
@@ -337,15 +303,10 @@ class RetailCollector(BaseCollector):
                     source_page="product", snapshot_path=result.snapshot_path,
                 )
 
-                # --- module 5: specs, written only when they change
                 self._store_specs(session, product_id, specs_raw)
 
-                # --- module 6: product-page badges
                 badge_findings = detect_badges(
                     brand=brand, processor_line=processor_line, product_type=product_type,
-                    # Same reasoning as the listing pass: the product page's
-                    # spec table names the processor, so full page text cannot
-                    # be used as badge evidence.
                     page_type="product", badge_text=" ".join(badge_texts),
                     exclude_text=title,
                 )
@@ -357,7 +318,6 @@ class RetailCollector(BaseCollector):
                         is_present=finding.is_present, evidence=finding.evidence,
                     ))
 
-                # --- module 2: P1-P5
                 results = [
                     checks.check_p1(brand=brand, title=title, processor_line=processor_line),
                     checks.check_p2(brand=brand, badge_findings=badge_findings),
@@ -380,12 +340,7 @@ class RetailCollector(BaseCollector):
         return audited
 
     def _store_specs(self, session: Session, product_id: int, specs: dict[str, str]) -> None:
-        """Persist specs only when the set differs from what we already hold.
-
-        Specs are near-static; writing a row per spec per run would grow the
-        table by ~15x with duplicates and make "when did this spec change?"
-        harder to answer, not easier.
-        """
+        """Persist specs only when the set differs from what we already hold."""
         if not specs:
             return
         from sqlalchemy import select as sa_select
@@ -409,11 +364,6 @@ class RetailCollector(BaseCollector):
             ))
 
 
-# ---------------------------------------------------------------------------
-# Platform specialisations
-# ---------------------------------------------------------------------------
-
-
 class NeweggCollector(RetailCollector):
     """Newegg US. SKUs look like N82E16834156001 and appear in /p/<sku>."""
 
@@ -425,7 +375,6 @@ class NeweggCollector(RetailCollector):
     def extract_sku(self, url: str) -> str | None:
         if m := self._SKU_RE.search(url):
             return m.group(1)
-        # Newegg also exposes /Product/Product.aspx?Item=<sku>
         if m := re.search(r"[?&]Item=([A-Za-z0-9]+)", url):
             return m.group(1)
         return None
@@ -492,7 +441,6 @@ class MercadoLibreCollector(RetailCollector):
             if node is None:
                 continue
             fraction = clean_text(node.text())
-            # The cents node is a sibling within the same money-amount block.
             cents_node = None
             parent = node.parent
             if parent is not None:

@@ -1,16 +1,4 @@
-"""Homepage banner tracking (module 3).
-
-Banners are the hardest thing in this project to attribute. A product listing
-has a title, a spec table and a badge; a banner has an image, an alt attribute
-and a link. So attribution runs over alt text plus the link URL, and the
-resulting `brand_confidence` is stored and surfaced rather than hidden — a
-banner-share chart built on weak attribution should look weak.
-
-Note the deliberate difference from product attribution: here a discrete-GPU
-token *does* attribute. "GeForce RTX 40 Series Deals" is an NVIDIA banner, not
-an unattributed one, because the banner's subject is the silicon itself rather
-than a device containing it.
-"""
+"""Homepage banner tracking (module 3)."""
 
 from __future__ import annotations
 
@@ -64,10 +52,6 @@ class BannerCollector(BaseCollector):
                 if result.ok and result.html:
                     tree = parse_html(result.html)
                     containers = select_all(tree, selectors.get("container"))
-                    # Fall back to searching the whole document: a homepage
-                    # redesign that renames the carousel wrapper should not
-                    # silently produce "zero banners", which would read as a
-                    # brand losing all banner share.
                     scope = containers[0] if containers else tree
                     slides = select_all(scope, selectors["slide"])
                     found = len(slides)
@@ -81,8 +65,6 @@ class BannerCollector(BaseCollector):
                         link = absolute_url(self.base_url, href)
                         image = select_one(slide, selectors.get("image"))
 
-                        # Link slug carries brand intent even when alt text is
-                        # generic ("/promotions/amd-ryzen-week").
                         haystack = clean_text(f"{alt} {link or ''}".replace("-", " ").replace("/", " "))
 
                         brand_attr = attribute_brand(haystack, is_component=True)

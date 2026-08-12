@@ -1,21 +1,4 @@
-"""Product catalogue backing the fixture set.
-
-Shaped to exercise every branch the real pipeline has to handle, not to look
-tidy:
-
-  * all four tracked brands, plus NVIDIA-only and unattributable SKUs so the
-    Share-of-Shelf denominator is honest
-  * all seven OEMs, plus board partners and bare components (which must resolve
-    to a NULL OEM, not "unknown")
-  * every product type in scope, including cross-listed components
-  * adversarial titles — Ryzen+RTX, Intel+Radeon, "M.2" near Apple tokens
-  * deliberately uneven badge compliance per brand, because a compliance score
-    where everyone sits at 100% demonstrates nothing
-
-`badge_rate` is the probability a given SKU renders its eligible badge. The
-spread across brands is what makes module 2 and module 6 produce a finding
-worth acting on rather than a flat wall of green.
-"""
+"""Product catalogue backing the fixture set."""
 
 from __future__ import annotations
 
@@ -28,22 +11,17 @@ class CatalogItem:
     title: str
     product_type: str
     oem: str | None
-    brand: str            # expected attribution, for test assertions
+    brand: str
     base_price_usd: float
     specs: dict[str, str] = field(default_factory=dict)
-    badge_alt: str | None = None      # badge text when rendered
-    has_brand_media: bool = True      # drives P4
-    has_oem_media: bool = True        # drives P5
+    badge_alt: str | None = None
+    has_brand_media: bool = True
+    has_oem_media: bool = True
     promo: str | None = None
 
 
-# Per-brand badge compliance, chosen to give the dashboard a real story:
-# Intel enforces hardest, Qualcomm is newest to these shelves and weakest.
 BADGE_RATE = {"intel": 0.86, "amd": 0.71, "qualcomm": 0.42, "apple": 0.93}
 
-# Rich-media compliance is separately uneven — a brand can win on badges and
-# lose on brand-led content, which is exactly the kind of split the audit is
-# meant to surface.
 BRAND_MEDIA_RATE = {"intel": 0.78, "amd": 0.63, "qualcomm": 0.31, "apple": 0.88}
 
 _N = "notebook"
@@ -55,7 +33,6 @@ _G = "gpu"
 
 
 CATALOG: list[CatalogItem] = [
-    # ---------------- Intel notebooks ----------------
     CatalogItem("N82E16834156001", "Lenovo Legion Pro 7i Gaming Laptop Intel Core i9-14900HX NVIDIA GeForce RTX 4080 32GB DDR5 1TB SSD 16\" WQXGA 240Hz", _N, "lenovo", "intel", 2499.99,
                 {"Processor": "Intel Core i9-14900HX", "Graphics": "NVIDIA GeForce RTX 4080 12GB", "Memory": "32GB DDR5", "Storage": "1TB PCIe SSD", "Screen Size": "16 inch", "Operating System": "Windows 11 Home"},
                 badge_alt="Intel Core i9"),
@@ -81,7 +58,6 @@ CATALOG: list[CatalogItem] = [
                 {"Processor": "Intel Core Ultra 7 165H", "Graphics": "NVIDIA RTX 2000 Ada", "Memory": "32GB DDR5", "Storage": "1TB SSD"},
                 badge_alt="Intel Core Ultra 7"),
 
-    # ---------------- AMD notebooks ----------------
     CatalogItem("N82E16834156101", "Lenovo Legion 5 Gaming Laptop AMD Ryzen 7 7735HS NVIDIA GeForce RTX 4060 16GB 512GB 15.6\" 144Hz", _N, "lenovo", "amd", 1099.99,
                 {"Processor": "AMD Ryzen 7 7735HS", "Graphics": "NVIDIA GeForce RTX 4060 8GB", "Memory": "16GB DDR5", "Storage": "512GB SSD"},
                 badge_alt="AMD Ryzen 7"),
@@ -104,7 +80,6 @@ CATALOG: list[CatalogItem] = [
                 {"Processor": "AMD Ryzen 7 7735HS", "Graphics": "NVIDIA GeForce RTX 4050 6GB", "Memory": "16GB DDR5", "Storage": "512GB SSD"},
                 badge_alt="AMD Ryzen 7"),
 
-    # ---------------- Qualcomm notebooks ----------------
     CatalogItem("N82E16834156201", "ASUS Zenbook A14 Snapdragon X Elite X1E-78-100 32GB 1TB OLED Copilot+ PC", _N, "asus", "qualcomm", 1399.99,
                 {"Processor": "Qualcomm Snapdragon X Elite X1E-78-100", "Graphics": "Qualcomm Adreno GPU", "Memory": "32GB LPDDR5X", "Storage": "1TB SSD"},
                 badge_alt="Snapdragon"),
@@ -121,7 +96,6 @@ CATALOG: list[CatalogItem] = [
                 {"Processor": "Qualcomm Snapdragon X Elite", "Memory": "32GB LPDDR5X", "Storage": "1TB SSD"},
                 badge_alt=None),
 
-    # ---------------- Apple ----------------
     CatalogItem("N82E16834156301", "Apple MacBook Pro 14\" M4 Pro chip 24GB Unified Memory 512GB SSD Space Black", _N, "apple", "apple", 1999.99,
                 {"Processor": "Apple M4 Pro chip", "Graphics": "Apple 16-core GPU", "Memory": "24GB Unified Memory", "Storage": "512GB SSD"},
                 badge_alt="Apple Silicon"),
@@ -141,7 +115,6 @@ CATALOG: list[CatalogItem] = [
                 {"Processor": "Apple M2 Ultra chip", "Memory": "64GB Unified Memory", "Storage": "1TB SSD"},
                 badge_alt="Apple Silicon"),
 
-    # ---------------- Desktops ----------------
     CatalogItem("N82E16883156401", "ASUS ROG Strix G16CH Gaming Desktop Intel Core i7-14700F RTX 4070 32GB 1TB", _D, "asus", "intel", 1799.99,
                 {"Processor": "Intel Core i7-14700F", "Graphics": "NVIDIA GeForce RTX 4070 12GB", "Memory": "32GB DDR5", "Storage": "1TB SSD"},
                 badge_alt="Intel Core i7"),
@@ -161,7 +134,6 @@ CATALOG: list[CatalogItem] = [
                 {"Processor": "Intel Core i7-14700F", "Graphics": "NVIDIA GeForce RTX 4060 Ti 8GB", "Memory": "16GB DDR5", "Storage": "1TB SSD"},
                 badge_alt="Intel Core i7"),
 
-    # ---------------- Components: CPUs (OEM must be NULL) ----------------
     CatalogItem("N82E16819113741", "AMD Ryzen 7 9800X3D 8-Core 16-Thread Unlocked Desktop Processor", _C, None, "amd", 479.00,
                 {"Processor": "AMD Ryzen 7 9800X3D", "Cores": "8", "Brand": "AMD"},
                 badge_alt="AMD Ryzen"),
@@ -178,7 +150,6 @@ CATALOG: list[CatalogItem] = [
                 {"Processor": "AMD Ryzen 5 7600X", "Cores": "6", "Brand": "AMD"},
                 badge_alt=None),
 
-    # ---------------- Components: GPUs (board partners -> NULL OEM) ----------
     CatalogItem("N82E16814137812", "GIGABYTE GeForce RTX 4070 SUPER WINDFORCE OC 12G Graphics Card", _G, None, "nvidia", 599.99,
                 {"Graphics": "NVIDIA GeForce RTX 4070 SUPER", "Graphics Memory": "12GB GDDR6X", "Brand": "GIGABYTE"}),
     CatalogItem("N82E16814137813", "ASUS TUF Gaming GeForce RTX 4060 Ti OC 8GB GDDR6 Graphics Card", _G, None, "nvidia", 419.99,
@@ -193,14 +164,12 @@ CATALOG: list[CatalogItem] = [
                 {"Graphics": "Intel Arc A770", "Graphics Memory": "16GB GDDR6", "Brand": "Intel"},
                 badge_alt="Intel Arc"),
 
-    # ---------------- Tablets ----------------
     CatalogItem("N82E16834156501", "Microsoft Surface Pro 11 Snapdragon X Elite 16GB 512GB Copilot+ 2-in-1", _T, None, "qualcomm", 1499.99,
                 {"Processor": "Qualcomm Snapdragon X Elite", "Memory": "16GB", "Storage": "512GB SSD"},
                 badge_alt="Snapdragon"),
     CatalogItem("N82E16834156502", "Lenovo Tab Extreme MediaTek Dimensity 9000 12GB 256GB Android Tablet", _T, "lenovo", "mediatek", 949.99,
                 {"Processor": "MediaTek Dimensity 9000", "Memory": "12GB", "Storage": "256GB"}),
 
-    # ---------------- Denominator honesty: unattributable SKUs ---------------
     CatalogItem("N82E16834156901", "Gaming Laptop Backpack 17.3 inch Water Resistant Travel Bag", _N, None, "other", 49.99,
                 {"Brand": "Generic", "Color": "Black"}, has_brand_media=False, has_oem_media=False),
     CatalogItem("N82E16834156902", "Refurbished Business Laptop 15.6\" 8GB 256GB SSD Windows 11", _N, None, "other", 299.99,
@@ -208,11 +177,6 @@ CATALOG: list[CatalogItem] = [
 ]
 
 
-# Mercado Libre catalogue. Portuguese titles and pt-BR spec labels, so the
-# normalisation layer is genuinely exercised rather than trivially passing on
-# English keys. Prices are BRL and set independently — currency conversion is
-# never applied, since comparing a US and a BR price directly would be
-# meaningless (tax, tariffs and channel margin all differ).
 ML_CATALOG: list[CatalogItem] = [
     CatalogItem("MLB3421001", "Notebook Gamer Lenovo Legion 5 AMD Ryzen 7 7735HS RTX 4060 16GB 512GB SSD 15.6\" 144Hz", _N, "lenovo", "amd", 8499.90,
                 {"Processador": "AMD Ryzen 7 7735HS", "Placa de vídeo": "NVIDIA GeForce RTX 4060", "Memória RAM": "16GB DDR5", "Capacidade de armazenamento": "512GB SSD", "Tamanho da tela": "15.6 polegadas"},
@@ -251,7 +215,6 @@ ML_CATALOG: list[CatalogItem] = [
                 {"Processador": "Intel Core i7-14650HX", "Placa de vídeo": "NVIDIA GeForce RTX 4060", "Memória RAM": "16GB DDR5"},
                 badge_alt="Intel Core i7"),
 
-    # Desktops / PC Gamer
     CatalogItem("MLB3422001", "PC Gamer Completo AMD Ryzen 5 5600G 16GB SSD 480GB Radeon Vega 7", _D, None, "amd", 2499.90,
                 {"Processador": "AMD Ryzen 5 5600G", "Memória RAM": "16GB DDR4", "Capacidade de armazenamento": "480GB SSD"},
                 badge_alt="AMD Ryzen 5"),
@@ -268,7 +231,6 @@ ML_CATALOG: list[CatalogItem] = [
                 {"Processador": "Apple M4 chip", "Memória RAM": "16GB", "Capacidade de armazenamento": "256GB SSD"},
                 badge_alt="Apple Silicon"),
 
-    # Components cross-listed into system categories — must resolve to cpu/gpu
     CatalogItem("MLB3423001", "Processador AMD Ryzen 5 5600X 3.7GHz 6-Core AM4 Box", _C, None, "amd", 899.90,
                 {"Processador": "AMD Ryzen 5 5600X", "Marca": "AMD"},
                 badge_alt="AMD Ryzen"),
@@ -284,7 +246,6 @@ ML_CATALOG: list[CatalogItem] = [
                 {"Placa de vídeo": "AMD Radeon RX 7800 XT", "Memória de vídeo": "16GB GDDR6", "Marca": "Sapphire"},
                 badge_alt="AMD Radeon"),
 
-    # Tablets
     CatalogItem("MLB3425001", "Apple iPad Pro 13\" Chip M4 256GB Wi-Fi", _T, "apple", "apple", 12499.00,
                 {"Processador": "Apple M4 chip", "Capacidade de armazenamento": "256GB"},
                 badge_alt="Apple Silicon"),
@@ -292,12 +253,10 @@ ML_CATALOG: list[CatalogItem] = [
                 {"Processador": "Qualcomm Snapdragon 8 Gen 2", "Memória RAM": "12GB"},
                 badge_alt="Snapdragon"),
 
-    # Workstation
     CatalogItem("MLB3426001", "Workstation Dell Precision 5690 Intel Core Ultra 7 165H 32GB RTX 2000 Ada", _W, "dell", "intel", 24999.90,
                 {"Processador": "Intel Core Ultra 7 165H", "Memória RAM": "32GB DDR5"},
                 badge_alt="Intel Core Ultra 7"),
 
-    # Denominator honesty
     CatalogItem("MLB3429001", "Mochila para Notebook Gamer 17 polegadas Impermeável", _N, None, "other", 189.90,
                 {"Marca": "Genérica"}, has_brand_media=False, has_oem_media=False),
 ]

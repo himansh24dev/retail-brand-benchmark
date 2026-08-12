@@ -1,15 +1,4 @@
-"""Scheduler implementing the brief's collection cadence.
-
-    Multiple times/day : price & promotion updates, retailer audits, banner tracking
-    Monthly            : brand benchmark scores (Share of Shelf), screenshots
-
-Three fixed slots rather than "every 8 hours" so that runs land at comparable
-times each day — comparing today's 09:00 to yesterday's 09:00 is meaningful in
-a way that comparing arbitrary 8-hour offsets is not. Retail pricing is diurnal;
-a drifting schedule would show phantom price movement.
-
-Banner tracking runs once daily per the brief, on the morning slot.
-"""
+"""Scheduler implementing the brief's collection cadence."""
 
 from __future__ import annotations
 
@@ -25,7 +14,6 @@ from ..config import platform_keys
 
 log = logging.getLogger(__name__)
 
-# UTC hours for the three daily slots.
 SLOT_HOURS = {"morning": 6, "midday": 13, "evening": 20}
 
 
@@ -43,20 +31,15 @@ def run_slot(slot: str, mode: str = "auto") -> dict:
 
     for platform in platform_keys():
         try:
-            # Modules 1, 2, 4, 5, 6 — every slot.
             summary["results"].append(COLLECTORS[platform](mode=mode).run())
         except Exception:
             log.exception("[%s] listing collection failed", platform)
 
         try:
-            # Module 8 — every slot; search rankings move intraday.
             summary["results"].append(SearchCollector(platform, mode=mode).run())
         except Exception:
             log.exception("[%s] search collection failed", platform)
 
-        # Module 3 — daily, per the brief. Running it three times would triple
-        # the row count without adding signal: homepage banners are scheduled
-        # merchandising, not intraday pricing.
         if slot == "morning":
             try:
                 summary["results"].append(BannerCollector(platform, mode=mode).run())
@@ -87,7 +70,7 @@ def run_monthly_benchmark(mode: str = "auto") -> None:
 
 def run_scheduler(mode: str = "auto", once: bool = False) -> None:
     if once:
-        from .runner import run_slot as _run  # re-import for clarity in logs
+        from .runner import run_slot as _run
 
         slot = _current_slot()
         result = _run(slot, mode=mode)
@@ -101,8 +84,6 @@ def run_scheduler(mode: str = "auto", once: bool = False) -> None:
         scheduler.add_job(
             run_slot, CronTrigger(hour=hour, minute=0),
             args=[slot, mode], id=f"collect_{slot}",
-            # Overlapping runs would double-count a slot and corrupt shelf
-            # share; skip rather than queue if the previous run is still going.
             max_instances=1, coalesce=True, misfire_grace_time=3600,
         )
         log.info("scheduled slot '%s' daily at %02d:00 UTC", slot, hour)

@@ -1,21 +1,4 @@
-"""Composite competitiveness score (nice-to-have).
-
-Rolls pricing, visibility and compliance into one rankable number per brand,
-per the brief's "single combined competitiveness score" suggestion.
-
-The honest caveat, stated here and surfaced in the dashboard: this is a
-*constructed* index, not an observation. Its weights are a judgement call, and
-different weights produce a different ranking. It earns its place as a
-conversation starter — "why is Qualcomm bottom?" — with every pillar
-decomposable back to the measured numbers underneath. It should never be quoted
-without its components.
-
-One subtlety that is easy to get wrong: price position has no objectively good
-direction. A premium brand priced high is executing its strategy, not losing.
-The default therefore scores price *stability* (deviation from the brand's own
-trailing median) rather than treating cheap as good; `lower_is_better` is
-available in config for clients who genuinely want price aggression scored.
-"""
+"""Composite competitiveness score (nice-to-have)."""
 
 from __future__ import annotations
 
@@ -34,27 +17,18 @@ from .core import (
 
 
 def _zscore(series: pd.Series, clamp: float) -> pd.Series:
-    """Normalise within a comparison group, clamped against outliers.
-
-    Returns 50 for a degenerate group (one brand, or zero variance): with
-    nothing to compare against, the neutral midpoint is the only defensible
-    answer, and min-max would return 0 or 100 arbitrarily.
-    """
+    """Normalise within a comparison group, clamped against outliers."""
     if len(series) < 2:
         return pd.Series([50.0] * len(series), index=series.index)
     std = series.std(ddof=0)
     if not std or np.isnan(std):
         return pd.Series([50.0] * len(series), index=series.index)
     z = ((series - series.mean()) / std).clip(-clamp, clamp)
-    # Map [-clamp, +clamp] onto [0, 100].
     return ((z + clamp) / (2 * clamp) * 100).astype(float)
 
 
 def _price_stability(history: pd.DataFrame) -> pd.DataFrame:
-    """Absolute deviation of each brand's latest median price from its trailing median.
-
-    Low deviation = stable positioning = higher score.
-    """
+    """Absolute deviation of each brand's latest median price from its trailing median."""
     if history.empty:
         return pd.DataFrame(columns=["platform", "brand", "price_deviation_pct"])
 
@@ -79,7 +53,6 @@ def competitiveness_score(tracked_only: bool = True) -> pd.DataFrame:
     clamp = float(cfg.get("zscore_clamp", 2.5))
     direction = cfg.get("price_position_direction", "stability")
 
-    # --- gather component metrics, each reduced to latest-per-brand
     shelf = share_of_shelf()
     if not shelf.empty:
         shelf = (shelf.sort_values("date")
@@ -126,14 +99,11 @@ def competitiveness_score(tracked_only: bool = True) -> pd.DataFrame:
         return pd.DataFrame()
 
     base = base.copy()
-    # Promo intensity is meaningful as zero (no discounting); a missing
-    # compliance score is not, so it stays NaN and is handled per-pillar below.
     for col in ("share_pct", "sov_pct", "banner_share_pct", "promo_rate_pct",
                 "avg_discount_pct", "price_deviation_pct"):
         if col in base:
             base[col] = base[col].fillna(0.0)
 
-    # --- normalise each component within its platform
     scored_parts: list[pd.DataFrame] = []
     for platform, chunk in base.groupby("platform"):
         chunk = chunk.copy()
@@ -144,17 +114,11 @@ def competitiveness_score(tracked_only: bool = True) -> pd.DataFrame:
         chunk["n_promo_intensity"] = _zscore(chunk["promo_rate_pct"], clamp)
 
         if direction == "lower_is_better":
-            # Cheaper = more competitive. Invert the median price ranking.
             chunk["n_price_position"] = 100 - _zscore(chunk["median_price"].fillna(0), clamp)
         else:
-            # Stability: less deviation scores higher.
             chunk["n_price_position"] = 100 - _zscore(chunk["price_deviation_pct"], clamp)
 
         if "compliance_score" in chunk and chunk["compliance_score"].notna().any():
-            # Compliance is already a 0-100 pass-rate; it is meaningful in
-            # absolute terms, so it is used directly rather than normalised
-            # against peers. A field where everyone complies should score
-            # everyone highly, not force a spread.
             chunk["n_brand_compliance_score"] = chunk["compliance_score"].fillna(
                 chunk["compliance_score"].mean()
             )
@@ -165,7 +129,6 @@ def competitiveness_score(tracked_only: bool = True) -> pd.DataFrame:
 
     scored = pd.concat(scored_parts, ignore_index=True)
 
-    # --- weighted rollup
     pillar_scores: dict[str, pd.Series] = {}
     for pillar_name, spec in pillars.items():
         components = spec["components"]

@@ -1,17 +1,4 @@
-"""Change detection (nice-to-have: "simple alerts/flags").
-
-Alerts compare the two most recent usable runs per platform. Two design points
-carry most of the weight:
-
-* **Dedupe, not re-fire.** A price that dropped 20% and stays there is one
-  event, not one per run for the rest of the week. `dedupe_key` encodes the
-  condition, so an unchanged state produces no new alert.
-
-* **Never alert on our own collection gaps.** A SKU missing because a fetch
-  failed is not a delisting, and a badge that vanished because the product page
-  did not load is not a compliance regression. Both are gated on the run having
-  actually succeeded.
-"""
+"""Change detection (nice-to-have: "simple alerts/flags")."""
 
 from __future__ import annotations
 
@@ -73,11 +60,6 @@ def generate_alerts() -> int:
     return created
 
 
-# ---------------------------------------------------------------------------
-# Individual detectors
-# ---------------------------------------------------------------------------
-
-
 def _pair_runs(
     df: pd.DataFrame, platform: str, current_run: int, previous_run: int
 ) -> pd.DataFrame:
@@ -88,8 +70,6 @@ def _pair_runs(
 
     current = subset[subset["run_id"] == current_run]
     previous = subset[subset["run_id"] == previous_run]
-    # One row per SKU per run: a SKU listed in two categories would otherwise
-    # produce a cartesian join and duplicate every alert.
     current = current.sort_values("observed_at").groupby("product_id", as_index=False).last()
     previous = previous.sort_values("observed_at").groupby("product_id", as_index=False).last()
 
@@ -155,8 +135,6 @@ def _stock_alerts(df, platform, current_run, previous_run, cfg) -> list[dict]:
     paired = _pair_runs(df, platform, current_run, previous_run)
     if paired.empty:
         return []
-    # in_stock is nullable: unknown is not out-of-stock, so require an explicit
-    # True -> False transition.
     went_oos = paired[(paired["in_stock"] == False) & (paired["in_stock_prev"] == True)]  # noqa: E712
     return [
         _alert_dict(row, "out_of_stock", cfg["out_of_stock"]["severity"], platform,
@@ -185,8 +163,6 @@ def _lifecycle_alerts(df, platform, current_run, previous_run, cfg) -> list[dict
         for row in rows.to_dict("records")
     ]
 
-    # Delisting is only claimed after N consecutive absences, tracked on the
-    # Product row by the collector — a single missed fetch must not fire it.
     with session_scope() as session:
         from ..db.models import Product
 
@@ -234,7 +210,6 @@ def _badge_alerts(platform, current_run, previous_run, cfg) -> list[dict]:
         return []
 
     out: list[dict] = []
-    # Only eligible badges can meaningfully disappear.
     disappeared = paired[
         paired["is_eligible"] & ~paired["is_present"] & paired["is_present_prev"]
     ]
@@ -318,11 +293,6 @@ def _shelf_alerts(platform, cfg) -> list[dict]:
     return out
 
 
-# ---------------------------------------------------------------------------
-# Persistence
-# ---------------------------------------------------------------------------
-
-
 def _alert_dict(row, alert_type, severity, platform, *, prev, new, message,
                 delta=None) -> dict:
     return {
@@ -337,8 +307,6 @@ def _alert_dict(row, alert_type, severity, platform, *, prev, new, message,
         "new_value": new,
         "delta": delta,
         "message": message,
-        # Value-bearing alerts include the new value in the key so a *further*
-        # move fires again, while an unchanged state stays quiet.
         "dedupe_key": f"{alert_type}|{platform}|{row['product_id']}|{new}",
     }
 

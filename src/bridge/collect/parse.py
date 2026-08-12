@@ -1,18 +1,4 @@
-"""Selector-chain resolution over scraped HTML.
-
-Config expresses selectors as ordered fallback chains with an optional
-attribute suffix:
-
-    title: ['a.item-title', '.item-info .item-title']
-    url:   ['a.item-title@href']
-    image: ['img@src', 'img@data-src']
-
-The chain is the point. Retail DOMs change without warning and usually in one
-place at a time; a chain survives a single rename where a lone selector returns
-None and silently zeroes out a metric. `MissTracker` records which selectors are
-returning nothing so drift is visible in the run summary rather than showing up
-a week later as an unexplained gap in a chart.
-"""
+"""Selector-chain resolution over scraped HTML."""
 
 from __future__ import annotations
 
@@ -26,12 +12,7 @@ from ..normalize.text import clean_text
 
 @dataclass
 class MissTracker:
-    """Counts selector chains that resolved to nothing.
-
-    A chain missing on one card is normal (not every product has a promo). A
-    chain missing on *every* card means the markup moved, which is a different
-    problem and needs to be loud.
-    """
+    """Counts selector chains that resolved to nothing."""
 
     attempts: Counter[str] = field(default_factory=Counter)
     misses: Counter[str] = field(default_factory=Counter)
@@ -64,11 +45,7 @@ def parse_html(html: str) -> HTMLParser:
 
 
 def _split_selector(selector: str) -> tuple[str, str | None]:
-    """Split 'a.item-title@href' into ('a.item-title', 'href').
-
-    A bare '@href' means "the attribute of the element itself", used when the
-    container node already is the anchor.
-    """
+    """Split 'a.item-title@href' into ('a.item-title', 'href')."""
     if "@" not in selector:
         return selector, None
     css, _, attr = selector.rpartition("@")
@@ -111,12 +88,7 @@ def select_all(root: Node | HTMLParser, chain: list[str] | tuple[str, ...] | Non
 
 
 def select_texts(root: Node | HTMLParser, chain: list[str] | tuple[str, ...] | None) -> list[str]:
-    """Collect every value a chain matches, across all matching selectors.
-
-    Unlike `select_one`, this does not stop at the first matching selector:
-    badges appear in several places on a page and the union is what the rubric
-    needs.
-    """
+    """Collect every value a chain matches, across all matching selectors."""
     out: list[str] = []
     for selector in chain or ():
         css, attr = _split_selector(selector)
@@ -125,18 +97,11 @@ def select_texts(root: Node | HTMLParser, chain: list[str] | tuple[str, ...] | N
             raw = node.attributes.get(attr) if attr else node.text()
             if cleaned := clean_text(raw):
                 out.append(cleaned)
-    # Order-preserving dedupe; the first occurrence is usually the most
-    # prominent placement, which matters for "prominently displayed".
     return list(dict.fromkeys(out))
 
 
 def extract_spec_table(root: Node | HTMLParser, chain: list[str] | tuple[str, ...] | None) -> dict[str, str]:
-    """Pull label/value pairs from a spec table.
-
-    Handles both shapes retailers use: two-cell rows (<th>label</th><td>value</td>)
-    and definition-list markup. Rows that do not resolve to exactly one label
-    and one value are skipped rather than guessed at.
-    """
+    """Pull label/value pairs from a spec table."""
     specs: dict[str, str] = {}
     for table in select_all(root, chain):
         for row in table.css("tr"):
@@ -148,7 +113,6 @@ def extract_spec_table(root: Node | HTMLParser, chain: list[str] | tuple[str, ..
             if key and value and key.lower() != value.lower():
                 specs.setdefault(key, value)
 
-        # Definition-list variant (Mercado Libre uses this on some categories).
         terms, definitions = table.css("dt"), table.css("dd")
         if terms and len(terms) == len(definitions):
             for term, definition in zip(terms, definitions):

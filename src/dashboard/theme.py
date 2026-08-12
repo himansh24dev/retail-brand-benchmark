@@ -1,35 +1,16 @@
-"""Chart theme: fixed brand palette and Plotly styling.
-
-Colour follows the *entity*, never its rank. BRAND_COLORS is a fixed map, so
-filtering the view from six brands to three never repaints the survivors — a
-reader who has learned "orange is AMD" keeps that across every chart and every
-filter state.
-
-Why not brand-true colours (Intel blue, AMD red, NVIDIA green)? They do not
-survive as a set: Intel's and Qualcomm's brand blues are near-identical, and
-Apple's grey falls below the chroma floor, so several pairs would be
-indistinguishable — and AMD-red against NVIDIA-green is the textbook
-red/green CVD collision. This palette was validated instead with the
-dataviz validator in both light and dark mode (all checks pass; light mode
-returns a contrast WARN, which is why every chart here ships direct labels
-and a table view).
-"""
+"""Chart theme: fixed brand palette and Plotly styling."""
 
 from __future__ import annotations
 
 import plotly.graph_objects as go
 
-# Categorical slots, assigned in fixed order. Tracked brands take the leading
-# slots because they are the ones that must stay separable.
 BRAND_COLORS: dict[str, str] = {
-    "intel": "#2a78d6",      # slot 1 blue
-    "amd": "#eb6834",        # slot 2 orange
-    "qualcomm": "#1baf7a",   # slot 3 aqua
-    "apple": "#eda100",      # slot 4 yellow
-    "nvidia": "#e87ba4",     # slot 5 magenta
-    "mediatek": "#008300",   # slot 6 green
-    # "other" is a residual bucket, not a competitor. Neutral grey says so and
-    # keeps it from reading as a fifth tracked brand.
+    "intel": "#2a78d6",
+    "amd": "#eb6834",
+    "qualcomm": "#1baf7a",
+    "apple": "#eda100",
+    "nvidia": "#e87ba4",
+    "mediatek": "#008300",
     "other": "#8c8b85",
     "unknown": "#8c8b85",
 }
@@ -45,9 +26,6 @@ BRAND_LABELS: dict[str, str] = {
     "unknown": "Unknown",
 }
 
-# Sequential ramp (single hue, light -> dark) for magnitude encodings such as
-# the compliance heatmap. Starts at step 250 so the lightest cell still clears
-# 2:1 against a light surface.
 SEQUENTIAL_BLUE = [
     [0.0, "#86b6ef"],
     [0.25, "#5598e7"],
@@ -56,7 +34,6 @@ SEQUENTIAL_BLUE = [
     [1.0, "#104281"],
 ]
 
-# Status colours, reserved — never reused as a series hue.
 STATUS = {
     "good": "#1baf7a",
     "warning": "#eda100",
@@ -118,11 +95,7 @@ def style(fig: go.Figure, *, height: int = 380, showlegend: bool = True,
 
 def brand_bar(df, *, x: str, y: str, orientation: str = "h",
               text_fmt: str = "{:.1f}", suffix: str = "") -> go.Figure:
-    """Horizontal bar with direct value labels.
-
-    Direct labels are not decoration here: the light-mode palette returns a
-    contrast WARN, and visible labels are the required relief.
-    """
+    """Horizontal bar with direct value labels."""
     fig = go.Figure()
     labels = [brand_label(b) for b in df[y]]
     fig.add_trace(go.Bar(
@@ -137,13 +110,8 @@ def brand_bar(df, *, x: str, y: str, orientation: str = "h",
     ))
     fig.update_traces(marker_cornerradius=4)
     fig = style(fig, showlegend=False, height=max(220, 46 * len(df) + 60))
-    # Outside labels on the longest bar get clipped at the plot edge. These
-    # labels are the contrast relief the palette requires, so headroom is not
-    # cosmetic — without it the largest value is the one you cannot read.
     values = [v for v in df[x] if v == v]
     if values:
-        # Headroom scales with label length: " / 100" needs far more room than
-        # "%", and a fixed multiplier clips exactly the largest bar.
         sample = f"{text_fmt.format(max(values))}{suffix}"
         fig.update_xaxes(range=[0, max(values) * (1.10 + 0.028 * len(sample))])
     return fig

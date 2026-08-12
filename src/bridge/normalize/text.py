@@ -11,18 +11,11 @@ _TAG_RE = re.compile(r"<[^>]+>")
 
 
 def clean_text(value: str | None) -> str:
-    """Collapse a scraped string into comparable plain text.
-
-    Retail markup arrives with entities, non-breaking spaces and stray tags
-    inside text nodes. Normalising here means every downstream regex sees one
-    consistent shape rather than each caller re-solving it.
-    """
+    """Collapse a scraped string into comparable plain text."""
     if not value:
         return ""
     text = html.unescape(value)
     text = _TAG_RE.sub(" ", text)
-    # NFKC folds the full-width and non-breaking variants retail sites emit
-    # (e.g. NBSP inside prices) onto their ASCII equivalents.
     text = unicodedata.normalize("NFKC", text)
     text = text.replace(" ", " ")
     return _WHITESPACE_RE.sub(" ", text).strip()

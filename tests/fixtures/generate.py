@@ -1,18 +1,4 @@
-"""Render the catalogue into platform-shaped HTML fixtures.
-
-The markup mirrors each platform's real DOM closely enough that the production
-selector chains in config/platforms.yaml resolve against it unchanged. That is
-the point: the parsers under test are the parsers that will run live, so a
-selector bug shows up here rather than on the first day of real collection.
-
-Variants model successive collection runs. Drift is deterministic (seeded per
-SKU per variant) so the same variant always renders identically — a run can be
-re-executed and reproduce its numbers exactly, which matters when explaining a
-chart in a walkthrough.
-
-Drift is applied to the *rendered HTML*, never to computed metrics. Every
-number downstream is derived by the real pipeline from these pages.
-"""
+"""Render the catalogue into platform-shaped HTML fixtures."""
 
 from __future__ import annotations
 
@@ -30,11 +16,7 @@ FIXTURE_ROOT = Path(__file__).resolve().parent
 
 
 def visible_specs(item: CatalogItem, drift: "Drift") -> dict[str, str]:
-    """The spec rows a page actually renders.
-
-    Drops the processor/brand rows when this SKU is drifted non-compliant, so
-    P3 has real failures to find.
-    """
+    """The spec rows a page actually renders."""
     if drift.spec_lists_processor:
         return item.specs
     hidden = {"processor", "processador", "brand", "marca"}
@@ -47,11 +29,6 @@ def _rng(*parts: object) -> random.Random:
     return random.Random(int(seed, 16))
 
 
-# ---------------------------------------------------------------------------
-# Drift: what changes between collection runs
-# ---------------------------------------------------------------------------
-
-
 class Drift:
     """Per-SKU, per-variant state changes."""
 
@@ -59,23 +36,18 @@ class Drift:
         rng = _rng(platform, item.sku, variant)
         self.variant = variant
 
-        # Price random walk. Bounded so a week of drift stays plausible;
-        # a few SKUs get a deliberate sharp cut to exercise price-drop alerts.
         drift_pct = rng.gauss(0, 2.2)
         if rng.random() < 0.06:
-            drift_pct -= rng.uniform(9, 22)     # flash sale
+            drift_pct -= rng.uniform(9, 22)
         drift_pct = max(-35.0, min(18.0, drift_pct))
         self.price = round(item.base_price_usd * (1 + drift_pct / 100), 2)
 
-        # Promotions come and go independently of price.
         self.on_promo = rng.random() < 0.34
         self.discount_pct = round(rng.uniform(6, 28)) if self.on_promo else 0
         self.price_was = (
             round(self.price / (1 - self.discount_pct / 100), 2) if self.on_promo else None
         )
 
-        # Badge presence: base rate per brand, with occasional loss so
-        # badge_disappeared alerts have something real to fire on.
         base_rate = BADGE_RATE.get(item.brand, 0.5)
         self.badge_present = bool(item.badge_alt) and rng.random() < base_rate
 
@@ -87,18 +59,10 @@ class Drift:
         self.rating = round(rng.uniform(3.6, 4.9), 1)
         self.reviews = rng.randint(3, 890)
         self.sponsored = rng.random() < 0.10
-        # Rank jitter drives share-of-shelf and SoV movement between runs.
         self.rank_jitter = rng.uniform(-1, 1)
 
-        # Title compliance (rubric S1/P1): a minority of listings omit the
-        # processor from the title entirely, which is a genuine retail failure
-        # mode and the thing S1 exists to catch.
         self.title_has_processor = rng.random() < 0.82
 
-        # Spec-table compliance (rubric P3). Retailers routinely publish a
-        # spec table that lists RAM and storage but never names the silicon.
-        # Without this the fixture set would render P3 at a flat 100% and the
-        # check would demonstrate nothing.
         self.spec_lists_processor = rng.random() < 0.80
 
 
@@ -119,11 +83,6 @@ def strip_processor(title: str, item: CatalogItem) -> str:
         if len(token) > 2:
             out = out.replace(token, "")
     return " ".join(out.split()) or title
-
-
-# ---------------------------------------------------------------------------
-# Newegg rendering
-# ---------------------------------------------------------------------------
 
 
 def _usd(value: float) -> tuple[str, str]:
@@ -217,7 +176,6 @@ def newegg_product_page(item: CatalogItem, variant: int) -> str:
             f'<div class="product-badges"><img src="/badge.png" alt="{item.badge_alt}"/></div>'
         )
 
-    # P4: brand-led rich media
     brand_media = ""
     if drift.brand_media and item.brand not in ("other", "nvidia", "mediatek"):
         brand_media = f"""
@@ -227,7 +185,6 @@ def newegg_product_page(item: CatalogItem, variant: int) -> str:
           <p>Engineered for gaming performance with {item.specs.get('Processor', 'the latest silicon')}.</p>
         </div>"""
 
-    # P5: OEM rich media
     oem_media = ""
     if drift.oem_media:
         oem_media = """
@@ -263,14 +220,8 @@ def newegg_product_page(item: CatalogItem, variant: int) -> str:
 </body></html>"""
 
 
-# ---------------------------------------------------------------------------
-# Mercado Libre rendering
-# ---------------------------------------------------------------------------
-
-
 def _brl(value: float) -> tuple[str, str]:
     whole, cents = f"{value:,.2f}".split(".")
-    # pt-BR: '.' groups thousands, ',' is the decimal separator.
     return whole.replace(",", "."), cents
 
 
@@ -400,12 +351,6 @@ def ml_product_page(item: CatalogItem, variant: int) -> str:
 </body></html>"""
 
 
-# ---------------------------------------------------------------------------
-# Homepage banners (module 3)
-# ---------------------------------------------------------------------------
-
-# Banner rotation per variant. Brand share here is deliberately uneven and
-# shifts across runs, so banner-share trend has something real to show.
 _BANNER_POOL = {
     "newegg_us": [
         ("Intel Core Ultra Powered Laptops - Save up to $400", "/promotions/intel-core-ultra", "Intel Core Ultra"),
@@ -433,17 +378,9 @@ def homepage(platform: str, variant: int, items: list[CatalogItem]) -> str:
     count = rng.randint(4, min(6, len(pool)))
     chosen = rng.sample(pool, count)
 
-    # Featured-product tiles, distinct from the carousel. Module 8 asks for
-    # brand presence on the home page as well as on search pages, and a
-    # carousel-only homepage would leave that path with nothing to parse.
-    # The selection is reseeded per variant so the brand mix moves run to run,
-    # which is what makes homepage presence a trend rather than a constant.
     feat_rng = _rng(platform, "featured", variant)
     featured = feat_rng.sample(items, min(8, len(items)))
 
-    # Each platform gets its own carousel markup. Rendering one shape for both
-    # would leave the other platform's selector chain permanently untested,
-    # which is exactly the bug this fixture set exists to catch early.
     if platform == "mercadolibre_br":
         slides = "".join(
             f"""
@@ -488,18 +425,8 @@ def homepage(platform: str, variant: int, items: list[CatalogItem]) -> str:
 </body></html>"""
 
 
-# ---------------------------------------------------------------------------
-# Search results (module 8)
-# ---------------------------------------------------------------------------
-
-
 def search_page(platform: str, keyword: str, variant: int, items: list[CatalogItem]) -> str:
-    """Rank the catalogue for a keyword.
-
-    Relevance is a crude token-overlap score plus per-run jitter — enough to
-    give each brand a defensible, moving rank distribution without pretending
-    to model a real search engine.
-    """
+    """Rank the catalogue for a keyword."""
     rng = _rng(platform, keyword, variant)
     tokens = {t for t in keyword.lower().split() if len(t) > 2}
 
@@ -531,17 +458,8 @@ def search_page(platform: str, keyword: str, variant: int, items: list[CatalogIt
 <body><div class="item-cells-wrap">{''.join(cells)}</div></body></html>"""
 
 
-# ---------------------------------------------------------------------------
-# Driver
-# ---------------------------------------------------------------------------
-
-
 def generate(variants: int = 9) -> None:
-    """Write the full fixture set.
-
-    Nine variants ~= three days at the brief's 3x-daily cadence, which is
-    enough for trends, alerts and slot-over-slot comparison to be meaningful.
-    """
+    """Write the full fixture set."""
     sys.path.insert(0, str(FIXTURE_ROOT.parents[1] / "src"))
     from bridge.config import keywords_config, platforms_config
 
@@ -559,7 +477,6 @@ def generate(variants: int = 9) -> None:
         for variant in range(variants):
             suffix = "" if variant == 0 else f".v{variant}"
 
-            # --- category listings
             for category in pcfg["listing"]["categories"]:
                 ctype = category["product_type"]
                 pool = [i for i in items if i.product_type == ctype]
@@ -582,7 +499,6 @@ def generate(variants: int = 9) -> None:
                     index.setdefault(url, f"{name}.html")
                     total_files += 1
 
-            # --- product pages
             for item in items:
                 if platform_key == "newegg_us":
                     url = f"https://www.newegg.com/p/{item.sku}"
@@ -595,14 +511,12 @@ def generate(variants: int = 9) -> None:
                 index.setdefault(url, f"{name}.html")
                 total_files += 1
 
-            # --- homepage banners + featured tiles
             (root / f"homepage{suffix}.html").write_text(
                 homepage(platform_key, variant, items), encoding="utf-8"
             )
             index.setdefault(pcfg["homepage"]["url"], "homepage.html")
             total_files += 1
 
-            # --- search results
             kw_cfg = keywords_config()["keyword_sets"][platform_key]
             for group in ("category", "branded"):
                 for entry in kw_cfg.get(group, []):

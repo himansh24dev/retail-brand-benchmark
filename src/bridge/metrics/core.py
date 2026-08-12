@@ -1,20 +1,4 @@
-"""Metric computations for modules 1-6 and 8.
-
-Every function returns a tidy DataFrame keyed on the brand axis, because that
-is the axis the brief rolls everything up on. OEM appears only as a column to
-filter by, never as a grouping key for a headline number.
-
-Two conventions run through all of it:
-
-* **Shares include an "other" bucket.** Share of Shelf, Share of Voice and
-  banner share are all computed against every listing seen, not just the four
-  tracked brands. Otherwise the four would always sum to 100% and a brand could
-  "gain share" purely because an untracked competitor was delisted.
-
-* **Prices are never converted between currencies.** A USD and a BRL price are
-  reported side by side but never averaged. Tax, tariffs and channel margin
-  differ enough that a converted average would be a number with no meaning.
-"""
+"""Metric computations for modules 1-6 and 8."""
 
 from __future__ import annotations
 
@@ -31,10 +15,6 @@ from .frames import (
     search_frame,
 )
 
-# ---------------------------------------------------------------------------
-# Module 4: Share of Shelf
-# ---------------------------------------------------------------------------
-
 
 def share_of_shelf(
     df: pd.DataFrame | None = None,
@@ -42,12 +22,7 @@ def share_of_shelf(
     by: tuple[str, ...] = ("platform", "date"),
     product_type: str | None = None,
 ) -> pd.DataFrame:
-    """Percentage of listed products belonging to each brand.
-
-    Counts distinct SKUs per run and then averages across the runs in a day, so
-    a day with three collection slots is not weighted three times heavier than
-    one with a failed slot.
-    """
+    """Percentage of listed products belonging to each brand."""
     df = observations_frame() if df is None else df
     if df.empty:
         return pd.DataFrame()
@@ -56,8 +31,6 @@ def share_of_shelf(
     if df.empty:
         return pd.DataFrame()
 
-    # Distinct SKUs per run first — a SKU appearing on two listing pages of the
-    # same category must not count twice.
     per_run = (
         df.groupby([*by, "run_id", "brand"])["product_id"]
         .nunique()
@@ -77,12 +50,7 @@ def share_of_shelf(
 
 
 def shelf_position(df: pd.DataFrame | None = None) -> pd.DataFrame:
-    """Where on the page each brand sits.
-
-    Share of Shelf alone can hide a real problem: a brand can hold 30% of
-    listings while occupying the bottom of every page. Median rank and
-    top-10 share are what make that visible.
-    """
+    """Where on the page each brand sits."""
     df = observations_frame() if df is None else df
     if df.empty or "listing_rank" not in df:
         return pd.DataFrame()
@@ -112,23 +80,12 @@ def shelf_position(df: pd.DataFrame | None = None) -> pd.DataFrame:
     return out.sort_values(["platform", "median_rank"])
 
 
-# ---------------------------------------------------------------------------
-# Module 1: Pricing & promotions
-# ---------------------------------------------------------------------------
-
-
 def pricing_summary(
     df: pd.DataFrame | None = None,
     *,
     by: tuple[str, ...] = ("platform", "date", "brand"),
 ) -> pd.DataFrame:
-    """Price level and promotional intensity per brand.
-
-    `promo_rate_pct` is the share of listings on promotion — the headline
-    "who is discounting hardest" number. `avg_discount_pct` is conditional on
-    being discounted, so a brand that discounts rarely but deeply reads
-    differently from one that discounts everything by 5%.
-    """
+    """Price level and promotional intensity per brand."""
     df = observations_frame() if df is None else df
     if df.empty:
         return pd.DataFrame()
@@ -159,12 +116,7 @@ def pricing_summary(
 
 
 def price_index(df: pd.DataFrame | None = None) -> pd.DataFrame:
-    """Each brand's median price relative to its comparable set (=100).
-
-    Comparison is within (platform, product_type) only. Indexing a notebook
-    against a bare CPU would be meaningless, and indexing across platforms
-    would compare currencies.
-    """
+    """Each brand's median price relative to its comparable set (=100)."""
     df = observations_frame() if df is None else df
     if df.empty:
         return pd.DataFrame()
@@ -213,18 +165,8 @@ def price_history(df: pd.DataFrame | None = None) -> pd.DataFrame:
     return out
 
 
-# ---------------------------------------------------------------------------
-# Module 2: Retailer audits -> Brand Compliance Score
-# ---------------------------------------------------------------------------
-
-
 def compliance_detail(df: pd.DataFrame | None = None) -> pd.DataFrame:
-    """Per-check pass rates, with coverage.
-
-    `coverage_pct` is the share of evaluated (non-null) checks. A 100% pass
-    rate on 20% coverage is not a good score — it is an unmeasured one, and the
-    dashboard needs both numbers to say so.
-    """
+    """Per-check pass rates, with coverage."""
     df = audit_frame() if df is None else df
     if df.empty:
         return pd.DataFrame()
@@ -250,12 +192,7 @@ def compliance_detail(df: pd.DataFrame | None = None) -> pd.DataFrame:
 
 
 def brand_compliance_score(df: pd.DataFrame | None = None) -> pd.DataFrame:
-    """The brief's headline: S1+S2+P1-P5 rolled up, 85% notebook / 15% desktop.
-
-    Product types outside that weighting are still scored and visible in
-    drill-down, but excluded from the headline number so it means what the
-    brief says it means.
-    """
+    """The brief's headline: S1+S2+P1-P5 rolled up, 85% notebook / 15% desktop."""
     detail = compliance_detail(df)
     if detail.empty:
         return pd.DataFrame()
@@ -268,7 +205,6 @@ def brand_compliance_score(df: pd.DataFrame | None = None) -> pd.DataFrame:
     detail = detail.copy()
     detail["check_weight"] = detail["check_code"].map(check_weights).fillna(1.0)
 
-    # Weighted mean of check pass-rates within each (brand, product_type).
     def _weighted(group: pd.DataFrame) -> pd.Series:
         valid = group[group["pass_rate_pct"].notna()]
         if valid.empty or valid["check_weight"].sum() == 0:
@@ -287,7 +223,6 @@ def brand_compliance_score(df: pd.DataFrame | None = None) -> pd.DataFrame:
         .reset_index()
     )
 
-    # Apply the 85/15 rollup across product types.
     headline = by_type[by_type["product_type"].isin(type_weights)].copy()
     if headline.empty:
         return by_type
@@ -297,9 +232,6 @@ def brand_compliance_score(df: pd.DataFrame | None = None) -> pd.DataFrame:
 
     def _rollup(group: pd.DataFrame) -> pd.Series:
         weights = group["type_weight"]
-        # Renormalise when a brand has no SKUs in one of the two weighted
-        # types: an Apple line with notebooks but no gaming desktops should be
-        # scored on what it actually sells, not penalised for the gap.
         total_weight = weights.sum()
         if total_weight == 0:
             return pd.Series({"compliance_score": np.nan, "coverage_pct": 0.0})
@@ -339,18 +271,8 @@ def compliance_history(df: pd.DataFrame | None = None) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True).sort_values("observed_at")
 
 
-# ---------------------------------------------------------------------------
-# Module 6: Badge relevance
-# ---------------------------------------------------------------------------
-
-
 def badge_compliance(df: pd.DataFrame | None = None) -> pd.DataFrame:
-    """Eligible-vs-present badge analysis.
-
-    `gap_count` — eligible but absent — is the actionable number. `misapplied`
-    (present but not eligible, e.g. an Evo badge on a desktop) is tracked
-    separately because it is a different conversation with the retailer.
-    """
+    """Eligible-vs-present badge analysis."""
     df = badges_frame() if df is None else df
     if df.empty:
         return pd.DataFrame()
@@ -386,7 +308,6 @@ def badge_gaps(df: pd.DataFrame | None = None, limit: int = 200) -> pd.DataFrame
     gaps = df[df["is_eligible"] & ~df["is_present"]].copy()
     if gaps.empty:
         return pd.DataFrame()
-    # Most recent observation per (SKU, badge, page).
     gaps = (
         gaps.sort_values("observed_at")
         .groupby(["product_id", "badge_name", "page_type"], as_index=False)
@@ -397,24 +318,13 @@ def badge_gaps(df: pd.DataFrame | None = None, limit: int = 200) -> pd.DataFrame
     return gaps[[c for c in cols if c in gaps.columns]].head(limit)
 
 
-# ---------------------------------------------------------------------------
-# Module 3: Banner share
-# ---------------------------------------------------------------------------
-
-
 def banner_share(df: pd.DataFrame | None = None) -> pd.DataFrame:
-    """Share of homepage banner slots by brand, with hero-slot weighting.
-
-    The hero slot is worth more than the fifth carousel position, so a
-    position-weighted share sits alongside the raw count. Raw share alone would
-    call a brand with five tail slots a bigger winner than one holding the hero.
-    """
+    """Share of homepage banner slots by brand, with hero-slot weighting."""
     df = banners_frame() if df is None else df
     if df.empty:
         return pd.DataFrame()
 
     df = df.copy()
-    # 1/position weighting: slot 1 = 1.00, slot 2 = 0.50, slot 4 = 0.25.
     df["slot_weight"] = 1.0 / df["slot_position"].clip(lower=1)
 
     out = (
@@ -438,20 +348,8 @@ def banner_share(df: pd.DataFrame | None = None) -> pd.DataFrame:
     return out.sort_values(["platform", "date", "share_pct"], ascending=[True, True, False])
 
 
-# ---------------------------------------------------------------------------
-# Module 8: Share of Voice
-# ---------------------------------------------------------------------------
-
-
 def share_of_voice(df: pd.DataFrame | None = None, *, group: str = "category") -> pd.DataFrame:
-    """Rank-weighted search visibility per brand.
-
-    Uses the DCG score recorded at collection time and multiplies by the
-    keyword's configured weight, so "gaming laptop" counts for more than
-    "gaming tablet". Defaults to category keywords: branded keywords are
-    reported separately because a brand ranking first for its own name is
-    expected and would drown out the contested terms.
-    """
+    """Rank-weighted search visibility per brand."""
     df = search_frame() if df is None else df
     if df.empty:
         return pd.DataFrame()
@@ -482,17 +380,7 @@ def share_of_voice(df: pd.DataFrame | None = None, *, group: str = "category") -
 
 
 def homepage_presence(df: pd.DataFrame | None = None) -> pd.DataFrame:
-    """Brand presence in the home page's featured product tiles.
-
-    The other half of the brief's module 8 ("presence and ranking on home page
-    and search results pages"). Kept as its own metric rather than folded into
-    `share_of_voice`, because a homepage tile and a keyword rank are different
-    kinds of visibility and a blended percentage would not survive the question
-    "what does this number actually mean?".
-
-    Position is DCG-discounted exactly as search rank is, so a brand holding the
-    first tile is not scored level with one in the last row.
-    """
+    """Brand presence in the home page's featured product tiles."""
     df = search_frame() if df is None else df
     if df.empty or "keyword_group" not in df.columns:
         return pd.DataFrame()
@@ -537,17 +425,8 @@ def keyword_detail(df: pd.DataFrame | None = None) -> pd.DataFrame:
     return out.sort_values(["platform", "keyword", "sov_pct"], ascending=[True, True, False])
 
 
-# ---------------------------------------------------------------------------
-# Cross-module helper
-# ---------------------------------------------------------------------------
-
-
 def brand_scoreboard() -> pd.DataFrame:
-    """One row per (platform, brand) joining the headline metric from each module.
-
-    This is the table the brief's "immediately understand how it stacks up"
-    requirement points at.
-    """
+    """One row per (platform, brand) joining the headline metric from each module."""
     shelf = share_of_shelf()
     if not shelf.empty:
         shelf = (

@@ -1,19 +1,4 @@
-"""Streamlit dashboard — the online deliverable.
-
-Structure follows the brief's eight modules, with the cross-brand benchmark on
-top because that is the framing the brief insists on: this is a side-by-side
-comparison, not a single-brand dashboard.
-
-Two things are deliberate throughout:
-
-* Every chart is accompanied by its underlying table. The validated palette
-  returns a light-mode contrast warning, and a table view is the required
-  relief — it also happens to be what makes a number defensible in a
-  walkthrough.
-* The data-source banner is not dismissible. These figures come from generated
-  fixtures, and anyone reading a chart should know that without having to open
-  the README.
-"""
+"""Streamlit dashboard — the online deliverable."""
 
 from __future__ import annotations
 
@@ -59,29 +44,16 @@ st.set_page_config(
 
 TTL = 300
 
-# Runs to build when the app has to populate its own warehouse. Nine variants is
-# roughly three days at the brief's 3x-daily cadence — enough for trends and
-# alerts to have something to compare.
 BOOTSTRAP_RUNS = 9
 
 
 @st.cache_resource(show_spinner=False)
 def bootstrap_warehouse() -> int:
-    """Build the warehouse on first boot if it is empty.
-
-    A hosted deployment starts with neither the fixture pages nor the database:
-    both are generated artefacts and are gitignored, and there is no shell on
-    the server to run `build-history` in. Without this the app would boot into
-    an empty dashboard on every fresh container and look broken.
-
-    Cached as a resource, so it runs once per server process and is skipped
-    entirely on a machine where the warehouse already has runs — a local
-    `build-history` is never re-done or overwritten.
-    """
+    """Build the warehouse on first boot if it is empty."""
     from bridge.cli import build_history
     from bridge.db.session import init_db
 
-    init_db()                      # create tables if absent; no-op if present
+    init_db()
     try:
         if not runs_frame().empty:
             return 0
@@ -94,11 +66,6 @@ def bootstrap_warehouse() -> int:
         "This happens once."
     ):
         return build_history(runs=BOOTSTRAP_RUNS, quiet=True)
-
-
-# ---------------------------------------------------------------------------
-# Cached data access
-# ---------------------------------------------------------------------------
 
 
 @st.cache_data(ttl=TTL)
@@ -166,18 +133,8 @@ def load_price_history() -> pd.DataFrame:
     return core.price_history()
 
 
-# ---------------------------------------------------------------------------
-# Shared chrome
-# ---------------------------------------------------------------------------
-
-
 def data_source_banner() -> None:
-    """Non-dismissible provenance notice.
-
-    The pipeline is production-shaped but its inputs are generated fixtures,
-    because both target retailers block datacenter traffic. Anyone reading a
-    number here needs that context attached to the number, not buried in docs.
-    """
+    """Non-dismissible provenance notice."""
     st.warning(
         "**Fixture data — not live retail.** Newegg and Mercado Libre both block "
         "datacenter IPs (verified: Newegg serves `/areyouahuman`, Mercado Libre "
@@ -222,11 +179,6 @@ def empty_state() -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# Pages
-# ---------------------------------------------------------------------------
-
-
 def page_overview() -> None:
     st.title("Brand Benchmark")
     st.caption(
@@ -255,7 +207,6 @@ def page_overview() -> None:
 
     st.divider()
 
-    # --- headline: who holds the shelf
     st.subheader("Share of Shelf")
     st.caption(
         "Percentage of listed gaming products belonging to each brand. The "
@@ -281,7 +232,6 @@ def page_overview() -> None:
 
     st.divider()
 
-    # --- scoreboard
     st.subheader("Cross-module scoreboard")
     st.caption(
         "One row per brand per platform, joining the headline number from each "
@@ -867,10 +817,6 @@ def page_competitiveness() -> None:
             use_container_width=True, key=f"comp_{platform}",
         )
 
-        # Pillars go on the x-axis and brands are the series, so colour keeps
-        # following the brand across every chart in the dashboard. Grouping the
-        # other way round would need three non-brand hues, and "blue" would
-        # then mean Compliance here while it means Intel everywhere else.
         pillar_cols = [c for c in ("pillar_pricing", "pillar_visibility",
                                    "pillar_compliance") if c in chunk.columns]
         fig = go.Figure()
@@ -1027,10 +973,6 @@ def page_data_quality() -> None:
         use_container_width=True, hide_index=True,
     )
 
-
-# ---------------------------------------------------------------------------
-# Navigation
-# ---------------------------------------------------------------------------
 
 PAGES = {
     "Overview": page_overview,

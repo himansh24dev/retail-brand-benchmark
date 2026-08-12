@@ -1,22 +1,4 @@
-"""Brand, OEM and product-type attribution.
-
-This is the load-bearing module of the project: the brief rolls every metric up
-on the Brand axis, so an attribution error propagates into Share of Shelf,
-compliance, SoV and the composite score simultaneously.
-
-Two rules do most of the work:
-
-1. **Discrete GPUs never attribute a system.** A "Lenovo Legion, Ryzen 7,
-   RTX 4070" is an AMD system with an NVIDIA GPU in it. Counting the RTX token
-   would hand the SKU to NVIDIA and quietly deflate AMD's shelf share. On a
-   standalone graphics card the same token *is* the product, so the rule
-   inverts. This is why `is_component` is resolved before brand.
-
-2. **Confidence is recorded, never discarded.** A title match and a
-   buried-in-specs match are both "AMD", but they are not equally trustworthy.
-   Storing the score lets the dashboard filter low-confidence rows instead of
-   presenting a guess as a fact.
-"""
+"""Brand, OEM and product-type attribution."""
 
 from __future__ import annotations
 
@@ -34,19 +16,15 @@ from ..config import (
 )
 from .text import clean_text
 
-# Product types where the chip is a component *of* a device.
 SYSTEM_TYPES = frozenset({"notebook", "desktop", "workstation", "tablet"})
 COMPONENT_TYPES = frozenset({"cpu", "gpu"})
 
-# Confidence tiers. Deliberately coarse — the aim is "can I trust this row?",
-# not a calibrated probability.
 CONF_LINE_IN_TITLE = 0.95
 CONF_LINE_IN_SPECS = 0.85
 CONF_BRAND_IN_TITLE = 0.60
 CONF_BRAND_IN_SPECS = 0.45
 CONF_NONE = 0.0
 
-# Below this, a row is attributed but flagged; metrics can exclude it.
 MIN_RELIABLE_CONFIDENCE = 0.60
 
 _COMPONENT_HINTS = re.compile(
@@ -76,34 +54,24 @@ class BrandAttribution:
 
 @dataclass(frozen=True)
 class OemAttribution:
-    # None is a valid, correct answer for standalone components — distinct
-    # from a failed match, which returns "unknown".
     oem: str | None
     sub_brand: str | None = None
     evidence: str | None = None
 
 
 def resolve_product_type(category_type: str | None, title: str) -> tuple[str, bool]:
-    """Resolve product type, preferring the category we crawled it from.
-
-    The category is strong evidence (we fetched the URL for that type), but
-    retailers cross-list: a "PC Gamer" category on Mercado Libre routinely
-    contains bare processors. Title hints override the category only when they
-    disagree decisively, which keeps components out of system-level metrics.
-    """
+    """Resolve product type, preferring the category we crawled it from."""
     title = clean_text(title)
     ctype = (category_type or "").strip().lower() or None
 
     if ctype in COMPONENT_TYPES:
         return ctype, True
     if ctype in SYSTEM_TYPES:
-        # Guard against components cross-listed into a system category.
         if _COMPONENT_HINTS.search(title) and not _SYSTEM_HINTS.search(title):
             return ("gpu" if re.search(r"v[ií]deo|graphics|gpu|rtx|radeon\s*rx", title, re.I)
                     else "cpu"), True
         return ctype, False
 
-    # No usable category — fall back to the title alone.
     if _COMPONENT_HINTS.search(title) and not _SYSTEM_HINTS.search(title):
         return ("gpu" if re.search(r"v[ií]deo|graphics|gpu", title, re.I) else "cpu"), True
     for candidate, pattern in (
@@ -124,16 +92,10 @@ def attribute_brand(
     spec_text: str = "",
     badge_text: str = "",
 ) -> BrandAttribution:
-    """Attribute a SKU to its chip/SoC supplier.
-
-    `spec_text` should be the flattened spec table and `badge_text` any badge
-    alt attributes; both are weaker evidence than the title but rescue listings
-    whose titles omit the processor entirely (common on Mercado Libre).
-    """
+    """Attribute a SKU to its chip/SoC supplier."""
     title_text = clean_text(title)
     secondary = clean_text(f"{spec_text} {badge_text}")
 
-    # --- Pass 1: processor lines, most-specific-first, title before specs.
     for source, text, confidence in (
         ("title", title_text, CONF_LINE_IN_TITLE),
         ("specs", secondary, CONF_LINE_IN_SPECS),
@@ -141,8 +103,6 @@ def attribute_brand(
         if not text:
             continue
         for line in processor_lines():
-            # Rule 1: a discrete-GPU token only attributes when the GPU is
-            # itself the product.
             if line.discrete_gpu and not is_component:
                 continue
             if not _has_context(line.brand, f"{title_text} {secondary}"):
@@ -157,7 +117,6 @@ def attribute_brand(
                         evidence=f"{source}:'{m.group(0)}'",
                     )
 
-    # --- Pass 2: bare brand mentions. No processor line, so no tier.
     for source, text, confidence in (
         ("title", title_text, CONF_BRAND_IN_TITLE),
         ("specs", secondary, CONF_BRAND_IN_SPECS),
@@ -165,11 +124,6 @@ def attribute_brand(
         if not text:
             continue
         for brand_key, patterns in brand_fallback_patterns():
-            # Rule 1 again, and it matters more here than in pass 1. A gaming
-            # laptop's title almost always names its discrete GPU vendor, so
-            # without this a system whose CPU is missing from the title gets
-            # attributed to NVIDIA purely for mentioning GeForce. Only brands
-            # that actually supply a CPU/SoC can claim a system.
             if not is_component and not _supplies_system_silicon(brand_key):
                 continue
             if not _has_context(brand_key, f"{title_text} {secondary}"):
@@ -182,20 +136,12 @@ def attribute_brand(
                         evidence=f"{source}:'{m.group(0)}'",
                     )
 
-    # Unattributed is a real bucket, not a dropped row: Share of Shelf needs it
-    # in the denominator or every brand's share is overstated.
     return BrandAttribution(brand="other", confidence=CONF_NONE, evidence=None)
 
 
 @functools.lru_cache(maxsize=None)
 def _supplies_system_silicon(brand_key: str) -> bool:
-    """Whether this brand ships a CPU/SoC that can power a whole system.
-
-    Derived from config rather than hardcoded: a brand qualifies if it declares
-    at least one processor line that is not a discrete GPU. NVIDIA declares
-    only GeForce lines, so it can never attribute a laptop or desktop — but it
-    still attributes a graphics card, where it is the product.
-    """
+    """Whether this brand ships a CPU/SoC that can power a whole system."""
     return any(
         line.brand == brand_key and not line.discrete_gpu for line in processor_lines()
     )
@@ -216,13 +162,7 @@ def attribute_oem(
     brand_field: str = "",
     spec_text: str = "",
 ) -> OemAttribution:
-    """Attribute the device maker.
-
-    Returns oem=None for standalone components: a bare CPU has no device maker,
-    and the brief says so explicitly. Board partners (Gigabyte, Zotac, ...) are
-    filtered rather than treated as OEMs, so an OEM drill-down never mixes
-    graphics-card vendors in with Dell and HP.
-    """
+    """Attribute the device maker."""
     if is_component:
         return OemAttribution(oem=None, evidence="component:no-oem")
 
@@ -230,8 +170,6 @@ def attribute_oem(
     if not haystack:
         return OemAttribution(oem="unknown")
 
-    # The platform's own brand field is authoritative when it names a tracked
-    # OEM — it is structured data rather than a substring of marketing copy.
     brand_field_text = clean_text(brand_field)
     if brand_field_text:
         for oem_key, patterns in oem_patterns():

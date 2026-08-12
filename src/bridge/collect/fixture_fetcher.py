@@ -1,20 +1,4 @@
-"""Fixture transport — serves saved HTML in place of live requests.
-
-Live collection from this environment is blocked: both target platforms redirect
-datacenter IPs to a challenge page (see docs/DATA_SOURCING.md). This fetcher
-lets the entire pipeline run, be tested and be demonstrated end-to-end without
-pretending the data is live.
-
-It deliberately mirrors `Fetcher`'s interface exactly — same `fetch()` signature,
-same `FetchResult`, same `stats`. Collectors therefore contain no branch on
-"are we in fixture mode": swapping transports is a constructor argument, and the
-parsing path under test is byte-for-byte the one that will run against live HTML.
-
-What this does NOT do is fabricate metrics. Fixtures are inputs to the real
-parsers; every number downstream is computed by the same code that would run in
-production. The honesty boundary is that the *inputs* are synthetic, and that is
-stated wherever the numbers are shown.
-"""
+"""Fixture transport — serves saved HTML in place of live requests."""
 
 from __future__ import annotations
 
@@ -37,13 +21,7 @@ FIXTURE_DIR = PROJECT_ROOT / "tests" / "fixtures"
 
 
 class FixtureFetcher:
-    """Drop-in replacement for `Fetcher` that reads from disk.
-
-    Fixtures are resolved by URL through a per-platform `index.json` mapping,
-    falling back to a deterministic hash of the URL. A miss returns a normal
-    failed FetchResult rather than raising, so a partially-populated fixture set
-    exercises the collector's error handling too.
-    """
+    """Drop-in replacement for `Fetcher` that reads from disk."""
 
     def __init__(
         self,
@@ -58,9 +36,6 @@ class FixtureFetcher:
         self.run_id = run_id
         self.stats = FetchStats()
         self.root = FIXTURE_DIR / platform_key
-        # A variant selects an alternate snapshot of the same URLs, which is how
-        # multi-run history is produced without inventing numbers at the metrics
-        # layer: each run reads a different point-in-time capture.
         self.variant = variant
         self._index = self._load_index()
 
@@ -128,8 +103,6 @@ class FixtureFetcher:
             except OSError as exc:
                 log.error("fixture read failed %s: %s", path, exc)
 
-        # A small delay keeps run timings and the scheduler's pacing realistic
-        # rather than completing a "3x daily" run in 40 milliseconds.
         time.sleep(random.uniform(0.01, 0.05))
         duration_ms = int((time.monotonic() - started) * 1000)
 
@@ -172,17 +145,7 @@ def make_fetcher(
     mode: str = "auto",
     variant: str | None = None,
 ):
-    """Return the transport for this run.
-
-    mode:
-      live     — always use the network
-      fixture  — always use saved HTML
-      auto     — fixture when a fixture set exists, else live
-
-    `auto` is the default so a developer with no credentials gets a working
-    pipeline, while a scheduled run in an environment with proxy access picks
-    up the network path without a code change.
-    """
+    """Return the transport for this run."""
     from .fetcher import Fetcher
 
     if mode == "live":

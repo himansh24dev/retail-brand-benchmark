@@ -1,14 +1,4 @@
-"""Share of Voice — search presence and ranking (module 8).
-
-For each keyword in the configured set, the collector records every result
-position it sees, not just the tracked brands'. That matters twice over: the
-denominator stays honest, and the dashboard can answer the follow-up question
-("who is holding the slots we're missing?") instead of only reporting an
-absence.
-
-Rank is converted to a DCG-style score at collection time, because position 1
-and position 30 are not worth the same and a linear count would say they are.
-"""
+"""Share of Voice — search presence and ranking (module 8)."""
 
 from __future__ import annotations
 
@@ -92,9 +82,6 @@ class SearchCollector(BaseCollector):
                             brand_attr = attribute_brand(title, is_component=is_component)
                             oem_attr = attribute_oem(title, is_component=is_component)
 
-                            # Link the ranking back to the SKU when we already
-                            # track it, so the SKU explorer can show "this
-                            # product ranks #3 for 'gaming laptop'".
                             product_id = self._match_product(session, link)
 
                             sponsored = bool(
@@ -132,18 +119,7 @@ class SearchCollector(BaseCollector):
             fetcher.close()
 
     def _collect_homepage(self, fetcher: Any) -> tuple[int, int]:
-        """Record brand presence in the home page's featured product tiles.
-
-        The brief scopes Share of Voice to "home page **and** search results
-        pages". Carousel banners are already covered by module 3, but those are
-        paid/merchandised slots; the featured grid is the organic surface a
-        shopper actually lands on, and a brand can hold banner space while being
-        absent from it.
-
-        Rows land in the same table as keyword rankings under their own
-        `keyword_group`, so the existing SoV number is untouched and homepage
-        presence can be reported separately or blended on request.
-        """
+        """Record brand presence in the home page's featured product tiles."""
         cfg = keywords_config().get("homepage_presence", {}) or {}
         if not cfg.get("enabled", True):
             return 0, 0
@@ -166,8 +142,6 @@ class SearchCollector(BaseCollector):
         tree = parse_html(result.html)
         tiles = select_all(tree, selectors["item"])
         if not tiles:
-            # Not an error: a homepage legitimately may carry no product grid
-            # that day. Logged so a silently-changed selector is still visible.
             log.info("[%s] homepage carried no featured product tiles",
                      self.platform_key)
             return 0, 0

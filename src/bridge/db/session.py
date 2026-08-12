@@ -1,10 +1,4 @@
-"""Engine and session management.
-
-SQLite is the default: the write pattern here is a handful of bulk appends per
-run, not concurrent OLTP, and a single file makes the whole warehouse portable
-for a walkthrough. `BRIDGE_DB_URL` swaps in Postgres without touching anything
-else if the collection cadence ever outgrows it.
-"""
+"""Engine and session management."""
 
 from __future__ import annotations
 
@@ -42,14 +36,9 @@ def get_engine() -> Engine:
         @event.listens_for(_engine, "connect")
         def _sqlite_pragmas(dbapi_conn, _record):  # type: ignore[no-untyped-def]
             cur = dbapi_conn.cursor()
-            # WAL lets the Streamlit dashboard read while a collection run
-            # writes. Without it the dashboard throws "database is locked"
-            # every time a run overlaps someone browsing.
             cur.execute("PRAGMA journal_mode=WAL")
             cur.execute("PRAGMA synchronous=NORMAL")
             cur.execute("PRAGMA foreign_keys=ON")
-            # Collection runs write in bursts; a short busy timeout turns a
-            # transient lock into a wait rather than an exception.
             cur.execute("PRAGMA busy_timeout=10000")
             cur.close()
 
